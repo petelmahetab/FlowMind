@@ -1,0 +1,79 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Plan {
+  free
+  pro
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String?
+  imageUrl  String?
+  plan      Plan     @default(free)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sops Sop[]
+
+  @@index([clerkId])
+}
+
+model Sop {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  rawText     String  @db.Text
+  shareSlug   String  @unique
+  isPublic    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps Step[]
+
+  @@index([userId])
+  @@index([shareSlug])
+}
+
+model Step {
+  id          String  @id @default(cuid())
+  sopId       String
+  sop         Sop     @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String? @db.Text
+  owner       String?
+  durationMins Int?
+  order       Int
+
+  checklistItems ChecklistItem[]
+
+  @@index([sopId])
+}
+
+model ChecklistItem {
+  id     String  @id @default(cuid())
+  stepId String
+  step   Step    @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  text  String
+  done  Boolean @default(false)
+  order Int
+
+  @@index([stepId])
+}

@@ -11,4 +11,4 @@ export function generateSlug(): string {
   return nanoid(10);
 }
 
-export const FREE_LIMIT = 3;
+export const FREE_LIMIT = 8;

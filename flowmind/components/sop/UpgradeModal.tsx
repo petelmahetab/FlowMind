@@ -1,6 +1,7 @@
 "use client";
 
 import { X, Zap, Check, ArrowRight } from "lucide-react";
+import { FREE_LIMIT } from "@/lib/utils";
 
 type Props = { onClose: () => void };
 
@@ -30,13 +31,14 @@ export default function UpgradeModal({ onClose }: Props) {
         </div>
 
         <div className="p-5">
-          <h2 className="text-xl font-bold text-gray-900 mt-2">
-            You've hit the free limit
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Free plan allows 3 SOPs. Upgrade to Pro for unlimited SOPs and team
-            features.
-          </p>
+          // Yeh line change karo:
+<h2 className="text-xl font-bold text-gray-900 mt-2">
+  You've used all your free SOPs
+</h2>
+<p className="text-sm text-gray-500 mt-1">
+  You've created {FREE_LIMIT} SOPs on the free plan. 
+  Upgrade to Pro for unlimited SOPs and team features.
+</p>
 
           {/* Features list */}
           <div className="mt-5 space-y-2">

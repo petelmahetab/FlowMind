@@ -1,42 +1,8 @@
-import {
-  GoogleGenerativeAI,
-  SchemaType,
-} from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-
-// ─── Zod-like schema we pass to Gemini for structured JSON output ───
-const sopSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    title: { type: SchemaType.STRING },
-    description: { type: SchemaType.STRING },
-    steps: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.OBJECT,
-        properties: {
-          title: { type: SchemaType.STRING },
-          description: { type: SchemaType.STRING },
-          owner: { type: SchemaType.STRING },
-          durationMins: { type: SchemaType.NUMBER },
-          checklistItems: {
-            type: SchemaType.ARRAY,
-            items: {
-              type: SchemaType.OBJECT,
-              properties: {
-                text: { type: SchemaType.STRING },
-              },
-              required: ["text"],
-            },
-          },
-        },
-        required: ["title", "description", "checklistItems"],
-      },
-    },
-  },
-  required: ["title", "description", "steps"],
-};
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY!,
+});
 
 export type GeneratedSop = {
   title: string;
@@ -53,37 +19,48 @@ export type GeneratedSop = {
 export async function generateSopFromText(
   rawText: string
 ): Promise<GeneratedSop> {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: sopSchema,
-    },
-  });
-
   const prompt = `
 You are an expert at turning messy process descriptions into clean, structured Standard Operating Procedures (SOPs).
 
-The user has described a process in plain English. Convert it into a structured SOP with:
-- A clear title (max 8 words)
-- A one-sentence description of what this SOP covers
-- 3-8 numbered steps, each with:
-  - A short action-oriented title (e.g. "Push code to main branch")
-  - A clear description of what to do and why
-  - An owner role if inferable (e.g. "Developer", "Team Lead", "DevOps")
-  - Estimated duration in minutes if inferable
-  - 2-4 checklist items (specific sub-tasks to tick off)
+Respond with ONLY valid JSON. No markdown, no backticks, no explanation.
 
-Keep it practical and actionable. Use imperative verbs. No fluff.
+JSON format:
+{
+  "title": "short title max 8 words",
+  "description": "one sentence describing this SOP",
+  "steps": [
+    {
+      "title": "action-oriented step title",
+      "description": "what to do and why",
+      "owner": "Developer",
+      "durationMins": 10,
+      "checklistItems": [
+        { "text": "specific sub-task" },
+        { "text": "another sub-task" }
+      ]
+    }
+  ]
+}
 
-User's process description:
+Rules:
+- 3 to 8 steps
+- 2 to 4 checklist items per step
+- Use imperative verbs
+- ONLY return JSON, nothing else
+
+User's process:
 """
 ${rawText}
-"""
-`.trim();
+"""`.trim();
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const completion = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    messages: [{ role: "user", content: prompt }],
+    temperature: 0.3,
+    max_tokens: 2000,
+  });
 
-  return JSON.parse(text) as GeneratedSop;
+  const text = completion.choices[0]?.message?.content ?? "";
+  const cleaned = text.replace(/```json/g, "").replace(/```/g, "").trim();
+  return JSON.parse(cleaned) as GeneratedSop;
 }

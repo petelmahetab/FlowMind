@@ -1,124 +1,193 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { UserButton } from "@clerk/nextjs";
+import { Plus, FileText, Trash2, ChevronRight, Zap } from "lucide-react";
+import { usePlan } from "@/hooks/usePlan";
+import BrainDumpModal from "./BrainDumpModal";
+import UpgradeModal from "./UpgradeModal";
 import ThemeToggle from "@/components/ThemeToggle";
+import type { Sop } from "@prisma/client";
+import { FREE_LIMIT } from "@/lib/utils";
 
-// Prisma User type ke saath match karna chahiye
-interface Sop {
-  id: string;
-  createdAt: Date;
-  steps: { id: string }[];
-  [key: string]: unknown;
-}
-
-interface User {
-  id: string;
-  clerkId: string;
+type SopWithStepCount = Sop & { steps: { id: string }[] };
+type InitialUser = {
+  name: string | null;
   email: string;
   plan: string;
-  sops: Sop[];
-}
+  sops: SopWithStepCount[];
+};
 
-interface DashboardClientProps {
-  initialUser: User;
-}
+export default function DashboardClient({ initialUser }: { initialUser: InitialUser }) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { atLimit, plan, sopCount, remaining, isLoading } = usePlan();
 
-export default function DashboardClient({ initialUser }: DashboardClientProps) {
+  const [sops, setSops] = useState<SopWithStepCount[]>(initialUser.sops);
+  const [showBrainDump, setShowBrainDump] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const plan = initialUser.plan as "free" | "pro";
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  function handleNewSop() {
+    // Loading state mein click allow karo — default free hai
+    if (!isLoading && atLimit) {
+      setShowUpgrade(true);
+    } else {
+      setShowBrainDump(true);
+    }
+  }
+
+  async function handleDelete(e: React.MouseEvent, sopId: string) {
+    e.stopPropagation();
+    if (!confirm("Delete this SOP? This cannot be undone.")) return;
+    setDeletingId(sopId);
+    try {
+      await fetch(`/api/sop/${sopId}`, { method: "DELETE" });
+      setSops((prev) => prev.filter((s) => s.id !== sopId));
+      queryClient.invalidateQueries({ queryKey: ["user-plan"] });
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleSopCreated(newSop: SopWithStepCount) {
+    setSops((prev) => [newSop, ...prev]);
+    queryClient.invalidateQueries({ queryKey: ["user-plan"] });
+    setShowBrainDump(false);
+    router.push(`/dashboard/sop/${newSop.id}`);
+  }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
-      {/* Navbar */}
-      <nav className="border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
-        {/* Logo / Brand */}
-        <div className="text-xl font-bold tracking-tight">
-          FlowMind
-        </div>
-
-        {/* Right side controls */}
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* Nav */}
+      <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
+        <span className="font-bold text-indigo-600 text-lg">FlowMind</span>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-
           {plan === "free" && (
             <button
               onClick={() => setShowUpgrade(true)}
-              className="text-sm px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+              className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors flex items-center gap-1"
             >
+              <Zap className="w-3 h-3" />
               Upgrade to Pro
             </button>
           )}
-
-          {/* suppressHydrationWarning — Clerk UserButton SSR mismatch fix */}
-          <div suppressHydrationWarning>
-            <UserButton afterSignOutUrl="/" />
-          </div>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </nav>
 
-      {/* Main content area */}
-      <main className="p-6">
-        <h1 className="text-2xl font-semibold mb-2">Dashboard</h1>
-        <p className="text-gray-500 dark:text-gray-400">
-          {plan === "pro"
-            ? "You're on the Pro plan 🎉"
-            : "You're on the Free plan. Upgrade for more features."}
-        </p>
+      <div className="max-w-3xl mx-auto px-6 py-10">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              Hey {initialUser.name?.split(" ")[0] ?? "there"} 👋
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {plan === "free"
+                ? `${sopCount} of ${FREE_LIMIT} SOPs used · ${remaining} remaining`
+                : "Pro · unlimited SOPs"}
+            </p>
+          </div>
+          <button
+            onClick={handleNewSop}
+            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            New SOP
+          </button>
+        </div>
 
-        {/* SOPs list */}
-        {initialUser.sops.length === 0 ? (
-          <div className="mt-8 text-center text-gray-400 dark:text-gray-500">
-            <p className="text-lg">No SOPs yet.</p>
-            <p className="text-sm mt-1">Create your first SOP to get started.</p>
+        {/* Free tier progress bar */}
+        {plan === "free" && (
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6">
+            <div className="flex items-center justify-between text-sm mb-2">
+              <span className="text-gray-600 dark:text-gray-400">Free plan usage</span>
+              <span className="text-gray-500">{sopCount} / {FREE_LIMIT}</span>
+            </div>
+            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+              <div
+                className="bg-indigo-600 h-2 rounded-full transition-all"
+                style={{ width: `${Math.min(100, (sopCount / FREE_LIMIT) * 100)}%` }}
+              />
+            </div>
+            {atLimit && (
+              <p className="text-xs text-amber-600 mt-2">
+                Limit reached.{" "}
+                <button onClick={() => setShowUpgrade(true)} className="underline">
+                  Upgrade to Pro
+                </button>
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* SOP list */}
+        {sops.length === 0 ? (
+          <div className="text-center py-20 bg-white dark:bg-gray-900 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700">
+            <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+            <p className="text-gray-500 font-medium">No SOPs yet</p>
+            <p className="text-gray-400 text-sm mt-1 mb-5">
+              Describe any process and AI will structure it for you
+            </p>
+            <button
+              onClick={handleNewSop}
+              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Create your first SOP
+            </button>
           </div>
         ) : (
-          <div className="mt-6 grid gap-4">
-            {initialUser.sops.map((sop) => (
+          <div className="space-y-3">
+            {sops.map((sop) => (
               <div
                 key={sop.id}
-                className="p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+                onClick={() => router.push(`/dashboard/sop/${sop.id}`)}
+                className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all group"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{sop.id}</span>
-                  <span className="text-sm text-gray-400">
-                    {sop.steps.length} steps
-                  </span>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                        {(sop as any).title ?? sop.id}
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        {sop.steps.length} steps ·{" "}
+                        {new Date(sop.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                      onClick={(e) => handleDelete(e, sop.id)}
+                      disabled={deletingId === sop.id}
+                      className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </main>
+      </div>
 
-      {/* Upgrade Modal */}
-      {showUpgrade && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-2">Upgrade to Pro</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Unlock all features with the Pro plan.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowUpgrade(false)}
-                className="flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  // TODO: Stripe checkout ya billing page pe redirect karo
-                  setShowUpgrade(false);
-                }}
-                className="flex-1 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
-              >
-                Upgrade Now
-              </button>
-            </div>
-          </div>
-        </div>
+      {showBrainDump && (
+        <BrainDumpModal
+          onClose={() => setShowBrainDump(false)}
+          onCreated={handleSopCreated}
+        />
       )}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     </div>
   );
 }

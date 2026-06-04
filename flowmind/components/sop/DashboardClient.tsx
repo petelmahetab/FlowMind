@@ -4,14 +4,16 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle } from "lucide-react";
-import { toast } from "sonner"; // 👈
+import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle, LayoutTemplate } from "lucide-react"; // 👈 LayoutTemplate add
+import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
 import BrainDumpModal from "./BrainDumpModal";
 import UpgradeModal from "./UpgradeModal";
+import TemplateLibraryModal from "./TemplateLibraryModal"; // 👈 add
 import ThemeToggle from "@/components/ThemeToggle";
 import type { Sop } from "@prisma/client";
 import { FREE_LIMIT } from "@/lib/utils";
+import type { SopTemplate } from "@/lib/templates"; // 👈 add
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };
 type InitialUser = {
@@ -29,8 +31,9 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
   const [sops, setSops] = useState<SopWithStepCount[]>(initialUser.sops);
   const [showBrainDump, setShowBrainDump] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false); // 👈 add
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<SopWithStepCount | null>(null); // 👈 replaces confirm()
+  const [deleteTarget, setDeleteTarget] = useState<SopWithStepCount | null>(null);
 
   function handleNewSop() {
     if (!isLoading && atLimit) {
@@ -40,20 +43,42 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
     }
   }
 
-  // 👈 Step 1: open custom dialog instead of confirm()
+  // 👈 add — template se SOP create
+  async function handleUseTemplate(template: SopTemplate) {
+    setShowTemplates(false);
+    if (!isLoading && atLimit) {
+      setShowUpgrade(true);
+      return;
+    }
+    const toastId = toast.loading(`Creating "${template.title}"...`);
+    try {
+      const res = await fetch("/api/sop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "template", templateId: template.id }),
+      });
+      if (!res.ok) throw new Error();
+      const newSop = await res.json();
+      setSops((prev) => [newSop, ...prev]);
+      queryClient.invalidateQueries({ queryKey: ["user-plan"] });
+      toast.success(`"${template.title}" created!`, { id: toastId });
+      router.push(`/dashboard/sop/${newSop.id}`);
+    } catch {
+      toast.error("Failed to create from template.", { id: toastId });
+    }
+  }
+
   function handleDeleteClick(e: React.MouseEvent, sop: SopWithStepCount) {
     e.stopPropagation();
     setDeleteTarget(sop);
   }
 
-  // 👈 Step 2: actual delete after user confirms in dialog
   async function confirmDelete() {
     if (!deleteTarget) return;
     const sopId = deleteTarget.id;
     const sopTitle = (deleteTarget as any).title ?? "This SOP";
     setDeleteTarget(null);
     setDeletingId(sopId);
-
     const toastId = toast.loading("Deleting SOP...");
     try {
       const res = await fetch(`/api/sop/${sopId}`, { method: "DELETE" });
@@ -72,7 +97,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
     setSops((prev) => [newSop, ...prev]);
     queryClient.invalidateQueries({ queryKey: ["user-plan"] });
     setShowBrainDump(false);
-    toast.success("SOP created! ✨"); // 👈 yeh wala missing tha
+    toast.success("SOP created! ✨");
     router.push(`/dashboard/sop/${newSop.id}`);
   }
 
@@ -109,13 +134,23 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
                 : "Pro · unlimited SOPs"}
             </p>
           </div>
-          <button
-            onClick={handleNewSop}
-            className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New SOP
-          </button>
+          {/* 👇 Two buttons side by side */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowTemplates(true)}
+              className="flex items-center gap-2 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <LayoutTemplate className="w-4 h-4" />
+              Templates
+            </button>
+            <button
+              onClick={handleNewSop}
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New SOP
+            </button>
+          </div>
         </div>
 
         {/* Free tier progress bar */}
@@ -150,13 +185,23 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
             <p className="text-gray-400 text-sm mt-1 mb-5">
               Describe any process and AI will structure it for you
             </p>
-            <button
-              onClick={handleNewSop}
-              className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Create your first SOP
-            </button>
+            {/* 👇 Empty state mein bhi dono buttons */}
+            <div className="flex items-center justify-center gap-2">
+              <button
+                onClick={() => setShowTemplates(true)}
+                className="inline-flex items-center gap-2 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <LayoutTemplate className="w-4 h-4" />
+                Browse templates
+              </button>
+              <button
+                onClick={handleNewSop}
+                className="inline-flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Create your first SOP
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -183,7 +228,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={(e) => handleDeleteClick(e, sop)} // 👈 changed
+                      onClick={(e) => handleDeleteClick(e, sop)}
                       disabled={deletingId === sop.id}
                       className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded"
                     >
@@ -198,7 +243,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
         )}
       </div>
 
-      {/* 👇 Custom Delete Dialog — replaces window.confirm() */}
+      {/* Delete dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 w-full max-w-sm shadow-xl">
@@ -238,6 +283,12 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
         <BrainDumpModal
           onClose={() => setShowBrainDump(false)}
           onCreated={handleSopCreated}
+        />
+      )}
+      {showTemplates && (
+        <TemplateLibraryModal
+          onClose={() => setShowTemplates(false)}
+          onUse={handleUseTemplate}
         />
       )}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}

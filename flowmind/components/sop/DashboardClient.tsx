@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, FileText, Trash2, ChevronRight, Zap } from "lucide-react";
+import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle } from "lucide-react";
+import { toast } from "sonner"; // 👈
 import { usePlan } from "@/hooks/usePlan";
 import BrainDumpModal from "./BrainDumpModal";
 import UpgradeModal from "./UpgradeModal";
@@ -29,9 +30,9 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
   const [showBrainDump, setShowBrainDump] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SopWithStepCount | null>(null); // 👈 replaces confirm()
 
   function handleNewSop() {
-    // Loading state mein click allow karo — default free hai
     if (!isLoading && atLimit) {
       setShowUpgrade(true);
     } else {
@@ -39,14 +40,29 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
     }
   }
 
-  async function handleDelete(e: React.MouseEvent, sopId: string) {
+  // 👈 Step 1: open custom dialog instead of confirm()
+  function handleDeleteClick(e: React.MouseEvent, sop: SopWithStepCount) {
     e.stopPropagation();
-    if (!confirm("Delete this SOP? This cannot be undone.")) return;
+    setDeleteTarget(sop);
+  }
+
+  // 👈 Step 2: actual delete after user confirms in dialog
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const sopId = deleteTarget.id;
+    const sopTitle = (deleteTarget as any).title ?? "This SOP";
+    setDeleteTarget(null);
     setDeletingId(sopId);
+
+    const toastId = toast.loading("Deleting SOP...");
     try {
-      await fetch(`/api/sop/${sopId}`, { method: "DELETE" });
+      const res = await fetch(`/api/sop/${sopId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       setSops((prev) => prev.filter((s) => s.id !== sopId));
       queryClient.invalidateQueries({ queryKey: ["user-plan"] });
+      toast.success(`"${sopTitle}" deleted`, { id: toastId });
+    } catch {
+      toast.error("Failed to delete. Try again.", { id: toastId });
     } finally {
       setDeletingId(null);
     }
@@ -56,6 +72,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
     setSops((prev) => [newSop, ...prev]);
     queryClient.invalidateQueries({ queryKey: ["user-plan"] });
     setShowBrainDump(false);
+    toast.success("SOP created! ✨"); // 👈 yeh wala missing tha
     router.push(`/dashboard/sop/${newSop.id}`);
   }
 
@@ -166,7 +183,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <button
-                      onClick={(e) => handleDelete(e, sop.id)}
+                      onClick={(e) => handleDeleteClick(e, sop)} // 👈 changed
                       disabled={deletingId === sop.id}
                       className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded"
                     >
@@ -180,6 +197,42 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
           </div>
         )}
       </div>
+
+      {/* 👇 Custom Delete Dialog — replaces window.confirm() */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-950 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Delete SOP?</p>
+                <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
+                  "{(deleteTarget as any).title ?? deleteTarget.id}"
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
+              This will permanently delete the SOP and all its steps. This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showBrainDump && (
         <BrainDumpModal

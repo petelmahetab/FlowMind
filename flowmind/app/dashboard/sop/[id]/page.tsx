@@ -28,5 +28,18 @@ export default async function SopEditorPage({
 
   if (!sop) notFound();
 
-  return <SopEditorClient initialSop={sop} />;
+  // 👇 User ki existing completions fetch karo
+  const completions = await prisma.stepCompletion.findMany({
+    where: { userId: user.id, sopId: id },
+    select: { stepId: true },
+  });
+
+  const initialCompletedIds = completions.map((c) => c.stepId);
+
+  return (
+    <SopEditorClient
+      initialSop={sop}
+      initialCompletedIds={initialCompletedIds} 
+    />
+  );
 }

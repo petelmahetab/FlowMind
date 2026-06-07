@@ -26,7 +26,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   sops Sop[]
-
+  stepCompletions StepCompletion[] 
   @@index([clerkId])
 }
 
@@ -45,6 +45,7 @@ model Sop {
   updatedAt DateTime @updatedAt
 
   steps Step[]
+  stepCompletions StepCompletion[] 
 
   @@index([userId])
   @@index([shareSlug])
@@ -62,7 +63,7 @@ model Step {
   order       Int
 
   checklistItems ChecklistItem[]
-
+stepCompletions StepCompletion[] 
   @@index([sopId])
 }
 
@@ -76,4 +77,19 @@ model ChecklistItem {
   order Int
 
   @@index([stepId])
+}
+
+model StepCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  stepId    String
+  sopId     String
+  completedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  step Step @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  sop  Sop  @relation(fields: [sopId],  references: [id], onDelete: Cascade)
+
+  @@unique([userId, stepId])   
+  @@index([userId, sopId])
 }

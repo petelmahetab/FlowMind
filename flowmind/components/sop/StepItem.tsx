@@ -28,7 +28,6 @@ export default function StepItem({ step, index, onChecklistToggle }: Props) {
     Object.fromEntries(step.checklistItems.map((i) => [i.id, i.done]))
   );
 
-  // ─── dnd-kit sortable hook ───
   const {
     attributes,
     listeners,

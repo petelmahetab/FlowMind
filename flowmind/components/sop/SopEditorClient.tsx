@@ -26,9 +26,13 @@ import {
   CheckCircle2,
   Circle,
   Download,
+  History,
+  UserPlus,
 } from "lucide-react";
 import StepItem from "./StepItem";
 import { useStepCompletion } from "@/hooks/useStepCompletion";
+import VersionHistoryModal from "./VersionHistoryModal";
+import AssignModal from "./AssignModal";
 import type { SopWithSteps } from "@/types";
 
 type Props = {
@@ -43,6 +47,8 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
   const [copied, setCopied] = useState(false);
   const [togglingPublic, setTogglingPublic] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
+  const [showAssign, setShowAssign] = useState(false);
 
   const {
     completedStepIds,
@@ -210,7 +216,7 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
             {sop.title}
           </h1>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Public/Private toggle */}
             <button
               onClick={togglePublic}
@@ -250,6 +256,24 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
             >
               <Download className="w-3 h-3" />
               {exporting ? "Preparing..." : "Export PDF"}
+            </button>
+
+            {/* 👇 Version History */}
+            <button
+              onClick={() => setShowVersions(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <History className="w-3 h-3" />
+              History
+            </button>
+
+            {/* 👇 Assign */}
+            <button
+              onClick={() => setShowAssign(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
+            >
+              <UserPlus className="w-3 h-3" />
+              Assign
             </button>
           </div>
         </div>
@@ -400,6 +424,14 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
           </SortableContext>
         </DndContext>
       </div>
+
+      {/* 👇 Modals */}
+      {showVersions && (
+        <VersionHistoryModal sopId={sop.id} onClose={() => setShowVersions(false)} />
+      )}
+      {showAssign && (
+        <AssignModal sopId={sop.id} onClose={() => setShowAssign(false)} />
+      )}
     </div>
   );
 }

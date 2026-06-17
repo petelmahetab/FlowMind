@@ -15,6 +15,14 @@ enum Plan {
   pro
 }
 
+
+enum AssignmentStatus {
+  pending
+  in_progress
+  completed
+  overdue
+}
+
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -25,8 +33,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sops Sop[]
-  stepCompletions StepCompletion[] 
+  sops             Sop[]
+  stepCompletions  StepCompletion[]
+  assignmentsGiven    SopAssignment[] @relation("AssignedBy")   
+  assignmentsReceived SopAssignment[] @relation("AssignedTo")   
+
   @@index([clerkId])
 }
 
@@ -44,8 +55,10 @@ model Sop {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps Step[]
-  stepCompletions StepCompletion[] 
+  steps            Step[]
+  stepCompletions  StepCompletion[]
+  versions         SopVersion[]      
+  assignments      SopAssignment[]   
 
   @@index([userId])
   @@index([shareSlug])
@@ -62,8 +75,9 @@ model Step {
   durationMins Int?
   order       Int
 
-  checklistItems ChecklistItem[]
-stepCompletions StepCompletion[] 
+  checklistItems  ChecklistItem[]
+  stepCompletions StepCompletion[]
+
   @@index([sopId])
 }
 
@@ -90,6 +104,49 @@ model StepCompletion {
   step Step @relation(fields: [stepId], references: [id], onDelete: Cascade)
   sop  Sop  @relation(fields: [sopId],  references: [id], onDelete: Cascade)
 
-  @@unique([userId, stepId])   
+  @@unique([userId, stepId])
   @@index([userId, sopId])
+}
+
+
+model SopVersion {
+  id        String   @id @default(cuid())
+  sopId     String
+  sop       Sop      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  versionNumber Int
+  title         String
+  description   String?
+  stepsSnapshot Json      
+  changeSummary String?   
+  editedBy      String?  
+
+  createdAt DateTime @default(now())
+
+  @@index([sopId])
+  @@unique([sopId, versionNumber])
+}
+
+model SopAssignment {
+  id     String @id @default(cuid())
+  sopId  String
+  sop    Sop    @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  assignedById String
+  assignedBy   User   @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
+
+  assignedToId String
+  assignedTo   User   @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: Cascade)
+
+  status   AssignmentStatus @default(pending)
+  dueDate  DateTime?
+  notifiedOverdue Boolean @default(false)  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sopId])
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@unique([sopId, assignedToId])  
 }

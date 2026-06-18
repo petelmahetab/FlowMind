@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Download } from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import type { SopWithSteps } from "@/types";
 
 type Props = { sop: SopWithSteps };
@@ -9,45 +11,63 @@ type Props = { sop: SopWithSteps };
 export default function ExportButton({ sop }: Props) {
   const [exporting, setExporting] = useState(false);
 
-  function handleExport() {
+  async function handleExport() {
     setExporting(true);
 
-    // Print-specific styles inject karo
-    const style = document.createElement("style");
-    style.id = "flowmind-print-style";
-    style.innerHTML = `
-      @media print {
-        body * { visibility: hidden !important; }
-        #flowmind-pdf, #flowmind-pdf * { visibility: visible !important; }
-        #flowmind-pdf {
-          position: fixed !important;
-          top: 0 !important;
-          left: 0 !important;
-          width: 100% !important;
-          background: white !important;
-          z-index: 99999 !important;
-          padding: 40px !important;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-        }
-        @page { margin: 20mm; size: A4; }
-      }
-    `;
-    document.head.appendChild(style);
+    try {
+      // Hidden container banao — screen pe kabhi nahi dikhega
+      const container = document.createElement("div");
+      container.style.position = "absolute";
+      container.style.left = "-9999px";
+      container.style.top = "0";
+      container.style.width = "800px";
+      container.style.background = "white";
+      container.style.padding = "40px";
+      container.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
-    // PDF content banao
-    const container = document.createElement("div");
-    container.id = "flowmind-pdf";
-    container.innerHTML = buildPdfHtml(sop);
-    document.body.appendChild(container);
+      container.innerHTML = buildPdfHtml(sop);
+      document.body.appendChild(container);
 
-    setTimeout(() => {
-      window.print();
+      // Thoda wait karo taaki fonts/layout settle ho jaaye
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Cleanup after print
-      document.head.removeChild(style);
+      // Canvas mein render karo — high resolution
+      const canvas = await html2canvas(container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+
       document.body.removeChild(container);
+
+      // PDF banao — multi-page support ke saath
+      const imgWidth = 210; // A4 width mm
+      const pageHeight = 297; // A4 height mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgData = canvas.toDataURL("image/png");
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      // Direct local download — koi print dialog nahi
+      const fileName = `${sop.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error("PDF export failed:", error);
+    } finally {
       setExporting(false);
-    }, 300);
+    }
   }
 
   return (
@@ -57,7 +77,7 @@ export default function ExportButton({ sop }: Props) {
       className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
     >
       <Download className="w-3 h-3" />
-      {exporting ? "Preparing..." : "Export PDF"}
+      {exporting ? "Generating..." : "Export PDF"}
     </button>
   );
 }
@@ -66,7 +86,7 @@ function buildPdfHtml(sop: SopWithSteps): string {
   const steps = sop.steps
     .map(
       (step, i) => `
-      <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; break-inside: avoid;">
+      <div style="margin-bottom: 20px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px;">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
           <span style="
             width: 24px; height: 24px; border-radius: 50%;
@@ -81,8 +101,8 @@ function buildPdfHtml(sop: SopWithSteps): string {
         ${
           step.owner || step.durationMins
             ? `<div style="display: flex; gap: 12px; margin-bottom: 8px;">
-                ${step.owner ? `<span style="font-size: 11px; color: #6b7280; background: #f9fafb; padding: 2px 8px; border-radius: 4px;">👤 ${step.owner}</span>` : ""}
-                ${step.durationMins ? `<span style="font-size: 11px; color: #6b7280; background: #f9fafb; padding: 2px 8px; border-radius: 4px;">⏱ ${step.durationMins} min</span>` : ""}
+                ${step.owner ? `<span style="font-size: 11px; color: #6b7280; background: #f9fafb; padding: 2px 8px; border-radius: 4px;">Owner: ${step.owner}</span>` : ""}
+                ${step.durationMins ? `<span style="font-size: 11px; color: #6b7280; background: #f9fafb; padding: 2px 8px; border-radius: 4px;">${step.durationMins} min</span>` : ""}
               </div>`
             : ""
         }
@@ -115,7 +135,6 @@ function buildPdfHtml(sop: SopWithSteps): string {
 
   return `
     <div>
-      <!-- Header -->
       <div style="margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid #4F46E5;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
           <span style="font-size: 12px; font-weight: 700; color: #4F46E5; letter-spacing: 0.05em;">FLOWMIND</span>
@@ -129,16 +148,14 @@ function buildPdfHtml(sop: SopWithSteps): string {
         </div>
       </div>
 
-      <!-- Steps -->
       <div>
         <h2 style="font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;">Process Steps</h2>
         ${steps}
       </div>
 
-      <!-- Footer -->
       <div style="margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 11px; color: #9ca3af;">Exported from FlowMind · flowmind.vercel.app</span>
-        <span style="font-size: 11px; color: #9ca3af;">Page 1</span>
+        <span style="font-size: 11px; color: #9ca3af;">Exported from FlowMind</span>
+        <span style="font-size: 11px; color: #9ca3af;">${new Date().toLocaleDateString()}</span>
       </div>
     </div>
   `;

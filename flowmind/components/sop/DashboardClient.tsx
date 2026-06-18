@@ -4,16 +4,18 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle, LayoutTemplate } from "lucide-react"; // 👈 LayoutTemplate add
+import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle, LayoutTemplate } from "lucide-react"; 
 import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
 import BrainDumpModal from "./BrainDumpModal";
 import UpgradeModal from "./UpgradeModal";
-import TemplateLibraryModal from "./TemplateLibraryModal"; // 👈 add
+import TemplateLibraryModal from "./TemplateLibraryModal"; 
 import ThemeToggle from "@/components/ThemeToggle";
 import type { Sop } from "@prisma/client";
 import { FREE_LIMIT } from "@/lib/utils";
-import type { SopTemplate } from "@/lib/templates"; // 👈 add
+import type { SopTemplate } from "@/lib/templates";
+import MyAssignments from "./MyAssignments";
+
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };
 type InitialUser = {
@@ -43,7 +45,6 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
     }
   }
 
-  // 👈 add — template se SOP create
   async function handleUseTemplate(template: SopTemplate) {
     setShowTemplates(false);
     if (!isLoading && atLimit) {
@@ -152,6 +153,9 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
             </button>
           </div>
         </div>
+
+          <MyAssignments />
+
 
         {/* Free tier progress bar */}
         {plan === "free" && (

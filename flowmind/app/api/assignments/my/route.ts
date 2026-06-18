@@ -13,7 +13,7 @@ export async function GET() {
   const myAssignments = await prisma.sopAssignment.findMany({
     where: { assignedToId: user.id },
     include: {
-      sop: { include: { steps: { select: { id: true } } } },
+       sop: { include: { steps: { select: { id: true } } } },
       assignedBy: { select: { name: true, email: true } },
     },
     orderBy: { dueDate: "asc" },

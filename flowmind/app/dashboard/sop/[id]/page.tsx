@@ -16,8 +16,15 @@ export default async function SopEditorPage({
   const user = await prisma.user.findUnique({ where: { clerkId: userId } });
   if (!user) redirect("/sign-in");
 
+  // 👇 Owner YA assigned user dono ko access milna chahiye
   const sop = await prisma.sop.findFirst({
-    where: { id, userId: user.id },
+    where: {
+      id,
+      OR: [
+        { userId: user.id },                          // Owner hai
+        { assignments: { some: { assignedToId: user.id } } }, // Assigned hai
+      ],
+    },
     include: {
       steps: {
         include: { checklistItems: { orderBy: { order: "asc" } } },
@@ -28,7 +35,6 @@ export default async function SopEditorPage({
 
   if (!sop) notFound();
 
-  // 👇 User ki existing completions fetch karo
   const completions = await prisma.stepCompletion.findMany({
     where: { userId: user.id, sopId: id },
     select: { stepId: true },
@@ -39,7 +45,7 @@ export default async function SopEditorPage({
   return (
     <SopEditorClient
       initialSop={sop}
-      initialCompletedIds={initialCompletedIds} 
+      initialCompletedIds={initialCompletedIds}
     />
   );
 }

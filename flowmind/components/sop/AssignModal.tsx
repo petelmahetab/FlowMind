@@ -84,6 +84,7 @@ export default function AssignModal({ sopId, onClose }: Props) {
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               min={new Date().toISOString().split("T")[0]}
+              max="2050-12-31"
               className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-gray-100"
             />
           </div>

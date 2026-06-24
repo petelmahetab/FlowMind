@@ -15,14 +15,6 @@ enum Plan {
   pro
 }
 
-
-enum AssignmentStatus {
-  pending
-  in_progress
-  completed
-  overdue
-}
-
 model User {
   id        String   @id @default(cuid())
   clerkId   String   @unique
@@ -33,12 +25,12 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sops             Sop[]
-  stepCompletions  StepCompletion[]
-  assignmentsGiven    SopAssignment[] @relation("AssignedBy")   
-  assignmentsReceived SopAssignment[] @relation("AssignedTo")   
+  sops Sop[]
 
   @@index([clerkId])
+
+  assignedToMe  SopAssignment[] @relation("AssignedTo")
+  assignedByMe  SopAssignment[] @relation("AssignedBy")
 }
 
 model Sop {
@@ -52,13 +44,15 @@ model Sop {
   shareSlug   String  @unique
   isPublic    Boolean @default(false)
 
+  // due date — needed so an ExecutionRun can be flagged overdue
+  dueDate     DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps            Step[]
-  stepCompletions  StepCompletion[]
-  versions         SopVersion[]      
-  assignments      SopAssignment[]   
+  steps         Step[]
+  executionRuns ExecutionRun[]
+  assignments   SopAssignment[]
 
   @@index([userId])
   @@index([shareSlug])
@@ -75,8 +69,7 @@ model Step {
   durationMins Int?
   order       Int
 
-  checklistItems  ChecklistItem[]
-  stepCompletions StepCompletion[]
+  checklistItems ChecklistItem[]
 
   @@index([sopId])
 }
@@ -90,63 +83,82 @@ model ChecklistItem {
   done  Boolean @default(false)
   order Int
 
+  stepLogs ExecutionStepLog[]
+
   @@index([stepId])
 }
 
-model StepCompletion {
-  id        String   @id @default(cuid())
-  userId    String
-  stepId    String
-  sopId     String
-  completedAt DateTime @default(now())
+// ─── Execution Tracking ───
+// One ExecutionRun = one person actually doing a SOP, start to finish.
+// This is what's missing in every SOP tool: proof someone followed it,
+// not just that someone wrote it.
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  step Step @relation(fields: [stepId], references: [id], onDelete: Cascade)
-  sop  Sop  @relation(fields: [sopId],  references: [id], onDelete: Cascade)
-
-  @@unique([userId, stepId])
-  @@index([userId, sopId])
+enum RunStatus {
+  in_progress
+  completed
+  overdue
 }
 
+model ExecutionRun {
+  id    String @id @default(cuid())
+  sopId String
+  sop   Sop    @relation(fields: [sopId], references: [id], onDelete: Cascade)
 
-model SopVersion {
-  id        String   @id @default(cuid())
-  sopId     String
-  sop       Sop      @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  // Who is executing — identified by email since they may not have an account
+  // (this also works for the public share-link flow, no login required)
+  executorEmail String
+  executorName  String?
 
-  versionNumber Int
-  title         String
-  description   String?
-  stepsSnapshot Json      
-  changeSummary String?   
-  editedBy      String?  
+  status      RunStatus @default(in_progress)
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
 
-  createdAt DateTime @default(now())
+  // denormalized progress counters — avoids recomputing on every dashboard read
+  totalItems     Int @default(0)
+  completedItems Int @default(0)
 
-  @@index([sopId])
-  @@unique([sopId, versionNumber])
-}
-
-model SopAssignment {
-  id     String @id @default(cuid())
-  sopId  String
-  sop    Sop    @relation(fields: [sopId], references: [id], onDelete: Cascade)
-
-  assignedById String
-  assignedBy   User   @relation("AssignedBy", fields: [assignedById], references: [id], onDelete: Cascade)
-
-  assignedToId String
-  assignedTo   User   @relation("AssignedTo", fields: [assignedToId], references: [id], onDelete: Cascade)
-
-  status   AssignmentStatus @default(pending)
-  dueDate  DateTime?
-  notifiedOverdue Boolean @default(false)  
+  stepLogs ExecutionStepLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([sopId])
+  @@index([executorEmail])
+  @@index([status])
+}
+
+// One row per checklist-item tick/untick — this is the audit trail.
+// "Who checked off step 4 at 2:14pm" is exactly what compliance reviews ask for.
+model ExecutionStepLog {
+  id    String       @id @default(cuid())
+  runId String
+  run   ExecutionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  checklistItemId String
+  checklistItem   ChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+
+  done       Boolean  @default(true)
+  toggledAt  DateTime @default(now())
+
+  @@index([runId])
+  @@index([checklistItemId])
+}
+
+model SopAssignment {
+  id           String    @id @default(cuid())
+  sopId        String
+  sop          Sop       @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  assignedToId String
+  assignedTo   User      @relation("AssignedTo", fields: [assignedToId], references: [id])
+
+  assignedById String
+  assignedBy   User      @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  status       String    @default("pending")
+  dueDate      DateTime?
+  createdAt    DateTime  @default(now())
+
   @@index([assignedToId])
-  @@index([assignedById])
-  @@unique([sopId, assignedToId])  
+  @@index([sopId])
 }

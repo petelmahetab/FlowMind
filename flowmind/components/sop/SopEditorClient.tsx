@@ -25,40 +25,46 @@ import {
   Check,
   CheckCircle2,
   Circle,
-  History,
-  UserPlus,
+  Users,
 } from "lucide-react";
 import StepItem from "./StepItem";
-import { useStepCompletion } from "@/hooks/useStepCompletion";
-import VersionHistoryModal from "./VersionHistoryModal";
-import AssignModal from "./AssignModal";
+import { useExecutionRun } from "@/hooks/useExecutionRun";
+import StartRunModal from "./StartRunModal";
+import RunsAnalytics from "./RunsAnalytics";
 import ExportButton from "./ExportButton";
 import type { SopWithSteps } from "@/types";
 
 type Props = {
   initialSop: SopWithSteps;
-  initialCompletedIds: string[];
 };
 
-export default function SopEditorClient({ initialSop, initialCompletedIds }: Props) {
+export default function SopEditorClient({ initialSop }: Props) {
   const router = useRouter();
   const [sop, setSop] = useState(initialSop);
   const [steps, setSteps] = useState(initialSop.steps);
   const [copied, setCopied] = useState(false);
   const [togglingPublic, setTogglingPublic] = useState(false);
-  const [showVersions, setShowVersions] = useState(false);
-  const [showAssign, setShowAssign] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  const totalChecklistItems = steps.reduce(
+    (sum, step) => sum + step.checklistItems.length,
+    0
+  );
 
   const {
-    completedStepIds,
-    completedSteps,
-    totalSteps,
-    progressPercent,
-    toggleStep,
+    runId,
+    completedItemIds,
+    completedItems,
+    totalItems,
+    status,
+    startRun,
+    toggleItem,
     togglingId,
-  } = useStepCompletion(sop.id, initialCompletedIds, initialSop.steps.length);
+    progressPercent,
+  } = useExecutionRun(sop.id, totalChecklistItems);
 
-  const isAllComplete = completedSteps === totalSteps && totalSteps > 0;
+  const isAllComplete = status === "completed";
+  const hasStartedRun = runId !== null;
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -94,22 +100,13 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // 👇 Checklist item toggle — ab execution run ke through hota hai
   const handleChecklistToggle = useCallback(
-    async (stepId: string, itemId: string, done: boolean) => {
-      setSteps((prev) =>
-        prev.map((step) =>
-          step.id === stepId
-            ? {
-                ...step,
-                checklistItems: step.checklistItems.map((item) =>
-                  item.id === itemId ? { ...item, done } : item
-                ),
-              }
-            : step
-        )
-      );
+    (stepId: string, itemId: string) => {
+      if (!hasStartedRun) return;
+      toggleItem(itemId);
     },
-    []
+    [hasStartedRun, toggleItem]
   );
 
   return (
@@ -161,25 +158,16 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
               </button>
             )}
 
-            {/* 👇 Export PDF — naya component, jsPDF wala */}
+            {/* Export PDF */}
             <ExportButton sop={{ ...sop, steps }} />
 
-            {/* Version History */}
+            {/* 👇 Execution analytics — kaun follow kar raha hai */}
             <button
-              onClick={() => setShowVersions(true)}
+              onClick={() => setShowAnalytics((p) => !p)}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
-              <History className="w-3 h-3" />
-              History
-            </button>
-
-            {/* Assign */}
-            <button
-              onClick={() => setShowAssign(true)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
-            >
-              <UserPlus className="w-3 h-3" />
-              Assign
+              <Users className="w-3 h-3" />
+              Activity
             </button>
           </div>
         </div>
@@ -202,38 +190,48 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
           </p>
         </div>
 
-        {/* Progress bar */}
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              {isAllComplete ? (
-                <CheckCircle2 className="w-4 h-4 text-green-500" />
-              ) : (
-                <Circle className="w-4 h-4 text-gray-300" />
-              )}
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                {isAllComplete ? "All steps complete!" : "Your progress"}
+        {/* 👇 Execution analytics panel — toggle se khulta hai */}
+        {showAnalytics && <RunsAnalytics sopId={sop.id} />}
+
+        {/* 👇 Start run prompt — jab tak run start nahi hua */}
+        {!hasStartedRun && totalChecklistItems > 0 && (
+          <StartRunModal onStart={startRun} />
+        )}
+
+        {/* Progress bar — sirf run start hone ke baad dikhega */}
+        {hasStartedRun && (
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                {isAllComplete ? (
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                ) : (
+                  <Circle className="w-4 h-4 text-gray-300" />
+                )}
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {isAllComplete ? "All steps complete!" : "Your progress"}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {completedItems} / {totalItems}
+                <span className="text-gray-400 ml-1">({progressPercent}%)</span>
               </span>
             </div>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {completedSteps} / {totalSteps}
-              <span className="text-gray-400 ml-1">({progressPercent}%)</span>
-            </span>
+            <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden">
+              <div
+                className={`h-2.5 rounded-full transition-all duration-500 ${
+                  isAllComplete ? "bg-green-500" : "bg-indigo-600"
+                }`}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {isAllComplete && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                🎉 SOP fully completed — great work!
+              </p>
+            )}
           </div>
-          <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden">
-            <div
-              className={`h-2.5 rounded-full transition-all duration-500 ${
-                isAllComplete ? "bg-green-500" : "bg-indigo-600"
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          {isAllComplete && (
-            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-              🎉 SOP fully completed — great work!
-            </p>
-          )}
-        </div>
+        )}
 
         {/* Public share banner */}
         {sop.isPublic && (
@@ -264,80 +262,22 @@ export default function SopEditorClient({ initialSop, initialCompletedIds }: Pro
             strategy={verticalListSortingStrategy}
           >
             <div className="space-y-3">
-              {steps.map((step, index) => {
-                const isCompleted = completedStepIds.has(step.id);
-                const isToggling = togglingId === step.id;
-
-                return (
-                  <div
-                    key={step.id}
-                    className={`transition-all duration-200 rounded-xl border ${
-                      isCompleted
-                        ? "border-green-200 dark:border-green-900 bg-green-50/40 dark:bg-green-950/20"
-                        : "border-transparent"
-                    }`}
-                  >
-                    {/* Completion toggle */}
-                    <div className="flex items-start gap-3 px-3 pt-3">
-                      <button
-                        onClick={() => toggleStep(step.id)}
-                        disabled={isToggling}
-                        aria-label={isCompleted ? "Mark incomplete" : "Mark complete"}
-                        className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                          isCompleted
-                            ? "bg-green-500 border-green-500 text-white"
-                            : "border-gray-300 dark:border-gray-600 hover:border-indigo-400"
-                        } ${isToggling ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
-                      >
-                        {isCompleted && (
-                          <svg
-                            className="w-3.5 h-3.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={3}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M5 13l4 4L19 7"
-                            />
-                          </svg>
-                        )}
-                      </button>
-
-                      <p
-                        className={`text-sm font-medium pt-0.5 ${
-                          isCompleted
-                            ? "line-through text-gray-400 dark:text-gray-600"
-                            : "text-gray-700 dark:text-gray-300"
-                        }`}
-                      >
-                        Step {index + 1} — {step.title}
-                      </p>
-                    </div>
-
-                    {/* StepItem */}
-                    <StepItem
-                      step={step}
-                      index={index}
-                      onChecklistToggle={handleChecklistToggle}
-                    />
-                  </div>
-                );
-              })}
+              {steps.map((step, index) => (
+                <div key={step.id} className="transition-all duration-200 rounded-xl border border-transparent">
+                  <StepItem
+                    step={step}
+                    index={index}
+                    onChecklistToggle={handleChecklistToggle}
+                    completedItemIds={completedItemIds}
+                    togglingId={togglingId}
+                    disabled={!hasStartedRun}
+                  />
+                </div>
+              ))}
             </div>
           </SortableContext>
         </DndContext>
       </div>
-
-      {/* Modals */}
-      {showVersions && (
-        <VersionHistoryModal sopId={sop.id} onClose={() => setShowVersions(false)} />
-      )}
-      {showAssign && (
-        <AssignModal sopId={sop.id} onClose={() => setShowAssign(false)} />
-      )}
     </div>
   );
 }

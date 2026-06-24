@@ -1,64 +1,77 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-// POST — step complete/incomplete toggle
+const completeSchema = z.object({
+  stepId: z.string().min(1),
+  completed: z.boolean(),
+});
+
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    const { id: sopId } = await params;
+    const body = await req.json();
+    const parsed = completeSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.errors[0].message },
+        { status: 400 }
+      );
+    }
+    const { stepId, completed } = parsed.data;
 
-  const { stepId, completed } = await req.json();
-
-  if (completed) {
-    // Completion record create karo — already hai toh ignore
-    await prisma.stepCompletion.upsert({
-      where: { userId_stepId: { userId: user.id, stepId } },
-      create: { userId: user.id, stepId, sopId: params.id },
-      update: { completedAt: new Date() },
+    const step = await prisma.step.findFirst({
+      where: { id: stepId, sopId, sop: { user: { clerkId: userId } } },
     });
-  } else {
-    // Completion record delete karo
-    await prisma.stepCompletion.deleteMany({
-      where: { userId: user.id, stepId },
+    if (!step) {
+      return NextResponse.json({ error: "Step not found" }, { status: 404 });
+    }
+
+    const updated = await prisma.step.update({
+      where: { id: stepId },
+      data: {
+        completed,
+        completedAt: completed ? new Date() : null,
+        completedBy: completed ? userId : null,
+      },
     });
+
+    const allSteps = await prisma.step.findMany({
+      where: { sopId },
+      select: { completed: true },
+    });
+    const allDone = allSteps.length > 0 && allSteps.every((s) => s.completed);
+
+    if (allDone) {
+      await prisma.sopAssignment.updateMany({
+        where: { sopId, status: { in: ["pending", "in_progress"] } },
+        data: { status: "completed", completedAt: new Date() },
+      });
+    } else if (completed) {
+      await prisma.sopAssignment.updateMany({
+        where: { sopId, status: "pending" },
+        data: { status: "in_progress" },
+      });
+    }
+
+    return NextResponse.json({
+      stepId: updated.id,
+      completed: updated.completed,
+    });
+  } catch (err) {
+    console.error("[sop/complete] error:", err);
+    return NextResponse.json(
+      { error: "Failed to update step" },
+      { status: 500 }
+    );
   }
-
-  // Updated progress return karo
-  const totalSteps = await prisma.step.count({ where: { sopId: params.id } });
-  const completedSteps = await prisma.stepCompletion.count({
-    where: { userId: user.id, sopId: params.id },
-  });
-
-  return NextResponse.json({ completedSteps, totalSteps });
-}
-
-// GET — is SOP ke liye user ki completions fetch karo
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } }
-) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-
-  const completions = await prisma.stepCompletion.findMany({
-    where: { userId: user.id, sopId: params.id },
-    select: { stepId: true, completedAt: true },
-  });
-
-  const totalSteps = await prisma.step.count({ where: { sopId: params.id } });
-
-  return NextResponse.json({
-    completedStepIds: completions.map((c) => c.stepId),
-    completedSteps: completions.length,
-    totalSteps,
-  });
 }

@@ -1,23 +1,47 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
-// GET — logged-in user ko assign ki gayi saari SOPs
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json([], { status: 200 });
+    }
 
-  const user = await prisma.user.findUnique({ where: { clerkId: userId } });
-  if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+    // Auto-create user in DB if they exist in Clerk but not in your DB
+    const clerkUser = await currentUser();
+    const user = await prisma.user.upsert({
+      where: { clerkId: userId },
+      update: {},
+      create: {
+        clerkId: userId,
+        email: clerkUser?.emailAddresses[0]?.emailAddress ?? "",
+        name: clerkUser?.fullName ?? null,
+      },
+    });
 
-  const myAssignments = await prisma.sopAssignment.findMany({
-    where: { assignedToId: user.id },
-    include: {
-       sop: { include: { steps: { select: { id: true } } } },
-      assignedBy: { select: { name: true, email: true } },
-    },
-    orderBy: { dueDate: "asc" },
-  });
+    await prisma.sopAssignment.updateMany({
+      where: {
+        assignedToId: user.id,
+        status: { in: ["pending", "in_progress"] },
+        dueDate: { lt: new Date() },
+      },
+      data: { status: "overdue" },
+    });
 
-  return NextResponse.json(myAssignments);
+    const assignments = await prisma.sopAssignment.findMany({
+      where: { assignedToId: user.id },
+      include: {
+        sop: { include: { steps: { select: { id: true } } } },
+        assignedBy: { select: { name: true, email: true } },
+      },
+      orderBy: { dueDate: "asc" },
+    });
+
+    return NextResponse.json(assignments);
+  } catch (error) {
+    console.error("assignments/my error:", error);
+    return NextResponse.json([], { status: 200 });
+  }
 }

@@ -14,7 +14,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import type { Sop } from "@prisma/client";
 import { FREE_LIMIT } from "@/lib/utils";
 import type { SopTemplate } from "@/lib/templates";
-import MyAssignments from "./MyAssignments";
+// import MyAssignments from "./MyAssignments";
+import MyAssignments from "@/components/sop/MyAssignments";
 
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };

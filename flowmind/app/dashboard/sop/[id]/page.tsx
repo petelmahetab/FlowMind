@@ -16,15 +16,8 @@ export default async function SopEditorPage({
   const user = await prisma.user.findUnique({ where: { clerkId: userId } });
   if (!user) redirect("/sign-in");
 
-  // 👇 Owner YA assigned user dono ko access milna chahiye
   const sop = await prisma.sop.findFirst({
-    where: {
-      id,
-      OR: [
-        { userId: user.id },                          // Owner hai
-        { assignments: { some: { assignedToId: user.id } } }, // Assigned hai
-      ],
-    },
+    where: { id, userId: user.id },
     include: {
       steps: {
         include: { checklistItems: { orderBy: { order: "asc" } } },
@@ -35,17 +28,5 @@ export default async function SopEditorPage({
 
   if (!sop) notFound();
 
-  const completions = await prisma.stepCompletion.findMany({
-    where: { userId: user.id, sopId: id },
-    select: { stepId: true },
-  });
-
-  const initialCompletedIds = completions.map((c) => c.stepId);
-
-  return (
-    <SopEditorClient
-      initialSop={sop}
-      initialCompletedIds={initialCompletedIds}
-    />
-  );
+  return <SopEditorClient initialSop={sop} />;
 }

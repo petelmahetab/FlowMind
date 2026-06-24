@@ -26,8 +26,17 @@ export default function MyAssignments() {
 
   useEffect(() => {
     fetch("/api/assignments/my")
-      .then((res) => res.json())
-      .then((data) => setAssignments(Array.isArray(data) ? data : []))
+      .then(async (res) => {
+        const text = await res.text();
+        if (!text) return [];
+        try {
+          const data = JSON.parse(text);
+          return Array.isArray(data) ? data : [];
+        } catch {
+          return [];
+        }
+      })
+      .then(setAssignments)
       .finally(() => setLoading(false));
   }, []);
 
@@ -37,24 +46,40 @@ export default function MyAssignments() {
     if (!dueDate) return null;
     const due = new Date(dueDate);
     const now = new Date();
-    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil(
+      (due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     if (diffDays < 0) {
-      return { label: `Overdue by ${Math.abs(diffDays)}d`, color: "text-red-600 bg-red-50 border-red-200" };
+      return {
+        label: `Overdue by ${Math.abs(diffDays)}d`,
+        color: "text-red-600 bg-red-50 border-red-200",
+      };
     }
     if (diffDays === 0) {
-      return { label: "Due today", color: "text-amber-600 bg-amber-50 border-amber-200" };
+      return {
+        label: "Due today",
+        color: "text-amber-600 bg-amber-50 border-amber-200",
+      };
     }
     if (diffDays <= 3) {
-      return { label: `Due in ${diffDays}d`, color: "text-amber-600 bg-amber-50 border-amber-200" };
+      return {
+        label: `Due in ${diffDays}d`,
+        color: "text-amber-600 bg-amber-50 border-amber-200",
+      };
     }
-    return { label: `Due ${due.toLocaleDateString()}`, color: "text-gray-500 bg-gray-50 border-gray-200" };
+    return {
+      label: `Due ${due.toLocaleDateString()}`,
+      color: "text-gray-500 bg-gray-50 border-gray-200",
+    };
   }
 
   return (
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Assigned to you</h2>
+        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+          Assigned to you
+        </h2>
         <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full">
           {assignments.length}
         </span>
@@ -84,14 +109,17 @@ export default function MyAssignments() {
                     {a.sop.title}
                   </p>
                   <p className="text-xs text-gray-400">
-                    Assigned by {a.assignedBy.name ?? a.assignedBy.email} · {a.sop.steps.length} steps
+                    Assigned by {a.assignedBy.name ?? a.assignedBy.email} ·{" "}
+                    {a.sop.steps.length} steps
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
                 {dueInfo && (
-                  <span className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${dueInfo.color}`}>
+                  <span
+                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${dueInfo.color}`}
+                  >
                     <Clock className="w-3 h-3" />
                     {dueInfo.label}
                   </span>

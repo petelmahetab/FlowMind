@@ -15,7 +15,7 @@ export default function ExportButton({ sop }: Props) {
     setExporting(true);
 
     try {
-      // Hidden container banao — screen pe kabhi nahi dikhega
+     
       const container = document.createElement("div");
       container.style.position = "absolute";
       container.style.left = "-9999px";
@@ -28,10 +28,10 @@ export default function ExportButton({ sop }: Props) {
       container.innerHTML = buildPdfHtml(sop);
       document.body.appendChild(container);
 
-      // Thoda wait karo taaki fonts/layout settle ho jaaye
+      
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Canvas mein render karo — high resolution
+   
       const canvas = await html2canvas(container, {
         scale: 2,
         useCORS: true,
@@ -40,7 +40,7 @@ export default function ExportButton({ sop }: Props) {
 
       document.body.removeChild(container);
 
-      // PDF banao — multi-page support ke saath
+    
       const imgWidth = 210; // A4 width mm
       const pageHeight = 297; // A4 height mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -60,7 +60,7 @@ export default function ExportButton({ sop }: Props) {
         heightLeft -= pageHeight;
       }
 
-      // Direct local download — koi print dialog nahi
+  
       const fileName = `${sop.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.pdf`;
       pdf.save(fileName);
     } catch (error) {

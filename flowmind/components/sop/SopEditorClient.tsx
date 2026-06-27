@@ -25,7 +25,7 @@ import {
   Check,
   CheckCircle2,
   Circle,
-  Users,
+  Users,FileBarChart
 } from "lucide-react";
 import StepItem from "./StepItem";
 import { useExecutionRun } from "@/hooks/useExecutionRun";
@@ -33,6 +33,7 @@ import StartRunModal from "./StartRunModal";
 import RunsAnalytics from "./RunsAnalytics";
 import ExportButton from "./ExportButton";
 import type { SopWithSteps } from "@/types";
+import AuditReportModal from "./AuditReportModal";
 
 type Props = {
   initialSop: SopWithSteps;
@@ -46,9 +47,11 @@ export default function SopEditorClient({ initialSop }: Props) {
   const [togglingPublic, setTogglingPublic] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
 
+  const [showAuditReport, setShowAuditReport] = useState(false);
+
   const totalChecklistItems = steps.reduce(
     (sum, step) => sum + step.checklistItems.length,
-    0
+    0,
   );
 
   const {
@@ -68,7 +71,9 @@ export default function SopEditorClient({ initialSop }: Props) {
 
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   function handleDragEnd(event: DragEndEvent) {
@@ -106,7 +111,7 @@ export default function SopEditorClient({ initialSop }: Props) {
       if (!hasStartedRun) return;
       toggleItem(itemId);
     },
-    [hasStartedRun, toggleItem]
+    [hasStartedRun, toggleItem],
   );
 
   return (
@@ -138,9 +143,13 @@ export default function SopEditorClient({ initialSop }: Props) {
               }`}
             >
               {sop.isPublic ? (
-                <><Globe className="w-3 h-3" /> Public</>
+                <>
+                  <Globe className="w-3 h-3" /> Public
+                </>
               ) : (
-                <><Lock className="w-3 h-3" /> Private</>
+                <>
+                  <Lock className="w-3 h-3" /> Private
+                </>
               )}
             </button>
 
@@ -151,9 +160,13 @@ export default function SopEditorClient({ initialSop }: Props) {
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
               >
                 {copied ? (
-                  <><Check className="w-3 h-3" /> Copied!</>
+                  <>
+                    <Check className="w-3 h-3" /> Copied!
+                  </>
                 ) : (
-                  <><Copy className="w-3 h-3" /> Copy link</>
+                  <>
+                    <Copy className="w-3 h-3" /> Copy link
+                  </>
                 )}
               </button>
             )}
@@ -168,6 +181,14 @@ export default function SopEditorClient({ initialSop }: Props) {
             >
               <Users className="w-3 h-3" />
               Activity
+            </button>
+
+            <button
+              onClick={() => setShowAuditReport(true)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <FileBarChart className="w-3 h-3" />
+              Audit Report
             </button>
           </div>
         </div>
@@ -186,7 +207,8 @@ export default function SopEditorClient({ initialSop }: Props) {
             <p className="text-sm text-gray-500 mt-1">{sop.description}</p>
           )}
           <p className="text-xs text-gray-400 mt-3">
-            {steps.length} steps · Created {new Date(sop.createdAt).toLocaleDateString()}
+            {steps.length} steps · Created{" "}
+            {new Date(sop.createdAt).toLocaleDateString("en-IN")}
           </p>
         </div>
 
@@ -263,7 +285,10 @@ export default function SopEditorClient({ initialSop }: Props) {
           >
             <div className="space-y-3">
               {steps.map((step, index) => (
-                <div key={step.id} className="transition-all duration-200 rounded-xl border border-transparent">
+                <div
+                  key={step.id}
+                  className="transition-all duration-200 rounded-xl border border-transparent"
+                >
                   <StepItem
                     step={step}
                     index={index}
@@ -274,6 +299,12 @@ export default function SopEditorClient({ initialSop }: Props) {
                   />
                 </div>
               ))}
+              {showAuditReport && (
+                <AuditReportModal
+                  sopId={sop.id}
+                  onClose={() => setShowAuditReport(false)}
+                />
+              )}
             </div>
           </SortableContext>
         </DndContext>

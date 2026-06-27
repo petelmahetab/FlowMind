@@ -19,6 +19,18 @@ export function useExecutionRun(sopId: string, totalItems: number) {
   });
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
+  // Restore saved run from localStorage on mount
+  useEffect(() => {
+    const savedRunId = localStorage.getItem(`flowmind_run_${sopId}`);
+    if (savedRunId) {
+      setState((prev) => {
+        if (prev.runId === savedRunId) return prev;
+        return { ...prev, runId: savedRunId };
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startRun = useCallback(
     async (executorEmail: string, executorName?: string) => {
       const res = await fetch(`/api/sop/${sopId}/runs`, {
@@ -27,24 +39,20 @@ export function useExecutionRun(sopId: string, totalItems: number) {
         body: JSON.stringify({ executorEmail, executorName }),
       });
       const run = await res.json();
-      setState((prev) => ({ ...prev, runId: run.id, status: run.status }));
+      if (!res.ok) throw new Error(run.error ?? "Failed to start run");
+
+      setState((prev) => ({
+        ...prev,
+        runId: run.id,
+        status: run.status,
+        totalItems: run.totalItems,
+        completedItems: run.completedItems ?? 0,
+      }));
       localStorage.setItem(`flowmind_run_${sopId}`, run.id);
       return run;
     },
     [sopId]
   );
-
-  // 👇 FIX — sirf ek baar mount pe chalega, sopId dependency hata diya
-  useEffect(() => {
-    const savedRunId = localStorage.getItem(`flowmind_run_${sopId}`);
-    if (savedRunId) {
-      setState((prev) => {
-        if (prev.runId === savedRunId) return prev; // already set hai, kuch mat karo
-        return { ...prev, runId: savedRunId };
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 👈 empty array — sirf mount pe ek baar
 
   const toggleItem = useCallback(
     async (checklistItemId: string) => {
@@ -53,6 +61,7 @@ export function useExecutionRun(sopId: string, totalItems: number) {
       const isCompleted = state.completedItemIds.has(checklistItemId);
       setTogglingId(checklistItemId);
 
+      // Optimistic update
       setState((prev) => {
         const next = new Set(prev.completedItemIds);
         if (isCompleted) next.delete(checklistItemId);
@@ -60,7 +69,9 @@ export function useExecutionRun(sopId: string, totalItems: number) {
         return {
           ...prev,
           completedItemIds: next,
-          completedItems: isCompleted ? prev.completedItems - 1 : prev.completedItems + 1,
+          completedItems: isCompleted
+            ? prev.completedItems - 1
+            : prev.completedItems + 1,
         };
       });
 
@@ -72,19 +83,45 @@ export function useExecutionRun(sopId: string, totalItems: number) {
         });
         if (!res.ok) throw new Error();
         const updated = await res.json();
-        setState((prev) => ({ ...prev, status: updated.status }));
-        if (!isCompleted) toast.success("Step complete!");
+
+        setState((prev) => ({
+          ...prev,
+          status: updated.status,
+          completedItems: updated.completedItems,
+          totalItems: updated.totalItems,
+        }));
+
+        if (!isCompleted) toast.success("Step complete! ✓");
+        if (updated.status === "completed") {
+          toast.success("🎉 SOP fully completed!");
+          localStorage.removeItem(`flowmind_run_${sopId}`);
+        }
       } catch {
+        // Rollback on error
+        setState((prev) => {
+          const next = new Set(prev.completedItemIds);
+          if (isCompleted) next.add(checklistItemId);
+          else next.delete(checklistItemId);
+          return {
+            ...prev,
+            completedItemIds: next,
+            completedItems: isCompleted
+              ? prev.completedItems + 1
+              : prev.completedItems - 1,
+          };
+        });
         toast.error("Failed to update. Try again.");
       } finally {
         setTogglingId(null);
       }
     },
-    [state.runId, state.completedItemIds, togglingId]
+    [state.runId, state.completedItemIds, togglingId, sopId]
   );
 
   const progressPercent =
-    state.totalItems > 0 ? Math.round((state.completedItems / state.totalItems) * 100) : 0;
+    state.totalItems > 0
+      ? Math.round((state.completedItems / state.totalItems) * 100)
+      : 0;
 
   return { ...state, startRun, toggleItem, togglingId, progressPercent };
 }

@@ -10,5 +10,12 @@ export function generateSlug(): string {
   // e.g. "deploy-frontend-k3x9p"
   return nanoid(10);
 }
+export function formatDate(date: Date | string): string {
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short", 
+    year: "numeric",
+  });
+}
 
 export const FREE_LIMIT = 10;

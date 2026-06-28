@@ -22,7 +22,7 @@ export default function StartExecutionCard({ sopId, onStarted }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/execution/start", {
+      const res = await fetch(`/api/sop/${sopId}/runs`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

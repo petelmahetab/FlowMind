@@ -49,7 +49,7 @@ export default async function PublicSopPage({
       <div className="max-w-2xl mx-auto px-6 pb-12 text-center">
         <p className="text-sm text-gray-400 mb-3">Made with FlowMind</p>
         
-          href="/"
+        <a  href="/"
           className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:underline"
         >
           <Share2 className="w-4 h-4" />

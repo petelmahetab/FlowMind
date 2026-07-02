@@ -34,12 +34,26 @@ type Props = {
 export default function AuditReportModal({ sopId, onClose }: Props) {
   const [data, setData] = useState<AuditData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
+
     fetch(`/api/sop/${sopId}/audit-report`)
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Server error ${res.status}: ${text || "No response body"}`);
+        }
+        return res.json();
+      })
       .then((d) => setData(d))
+      .catch((err) => {
+        console.error("[AuditReportModal] fetch failed:", err);
+        setError(err.message ?? "Failed to load report. Please try again.");
+      })
       .finally(() => setLoading(false));
   }, [sopId]);
 
@@ -152,8 +166,8 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
       }
 
       pdf.save(`${data.sop.title.replace(/[^a-z0-9]/gi, "-").toLowerCase()}-audit-report.pdf`);
-    } catch (error) {
-      console.error("Export failed:", error);
+    } catch (err) {
+      console.error("Export failed:", err);
     } finally {
       setExporting(false);
     }
@@ -167,7 +181,10 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
             <FileBarChart className="w-4 h-4 text-indigo-600" />
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Audit report</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -175,6 +192,32 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
         <div className="overflow-y-auto flex-1 p-5">
           {loading ? (
             <p className="text-sm text-gray-400 text-center py-12">Loading report...</p>
+          ) : error ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="w-8 h-8 text-red-300 mx-auto mb-2" />
+              <p className="text-sm text-red-500 font-medium">Failed to load report</p>
+              <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">{error}</p>
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  setError(null);
+                  fetch(`/api/sop/${sopId}/audit-report`)
+                    .then(async (res) => {
+                      if (!res.ok) {
+                        const text = await res.text();
+                        throw new Error(`Server error ${res.status}: ${text || "No response body"}`);
+                      }
+                      return res.json();
+                    })
+                    .then((d) => setData(d))
+                    .catch((err) => setError(err.message ?? "Failed to load report."))
+                    .finally(() => setLoading(false));
+                }}
+                className="mt-4 text-xs text-indigo-600 hover:underline"
+              >
+                Try again
+              </button>
+            </div>
           ) : !data || data.summary.totalRuns === 0 ? (
             <div className="text-center py-12">
               <Users className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -212,11 +255,16 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
                     {data.stepBreakdown
                       .filter((s) => s.completionRate < 70)
                       .map((s, i) => (
-                        <div key={i} className="flex items-center justify-between bg-red-50 dark:bg-red-950 rounded-lg px-3 py-2">
+                        <div
+                          key={i}
+                          className="flex items-center justify-between bg-red-50 dark:bg-red-950 rounded-lg px-3 py-2"
+                        >
                           <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
                             {s.stepTitle} — {s.text}
                           </span>
-                          <span className="text-xs font-bold text-red-600 flex-shrink-0 ml-2">{s.completionRate}%</span>
+                          <span className="text-xs font-bold text-red-600 flex-shrink-0 ml-2">
+                            {s.completionRate}%
+                          </span>
                         </div>
                       ))}
                   </div>
@@ -226,7 +274,10 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Execution history</p>
               <div className="space-y-1.5">
                 {data.runs.map((r) => (
-                  <div key={r.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                  <div
+                    key={r.id}
+                    className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2"
+                  >
                     <span className="text-xs text-gray-700 dark:text-gray-300 truncate">
                       {r.executorName ?? r.executorEmail}
                     </span>

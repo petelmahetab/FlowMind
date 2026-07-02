@@ -24,58 +24,78 @@ export async function POST(
     }
     const { checklistItemId, done } = parsed.data;
 
-    const run = await prisma.executionRun.findUnique({
+    // Guard check bahar rakha hai (transaction shuru hone se pehle) —
+    // taaki already-completed run pe turant fail-fast ho jaaye,
+    // bina ek transaction start kiye
+    const existingRun = await prisma.executionRun.findUnique({
       where: { id: runId },
       include: { sop: { select: { dueDate: true } } },
     });
-    if (!run) {
+    if (!existingRun) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
-    if (run.status === "completed") {
+    if (existingRun.status === "completed") {
       return NextResponse.json(
         { error: "This run is already completed" },
         { status: 400 }
       );
     }
 
-    await prisma.executionStepLog.create({
-      data: { runId, checklistItemId, done },
-    });
+    // Sab kuch ek hi transaction ke andar — Serializable isolation
+    // ensures ki parallel toggle requests ek dusre ko overwrite na karein
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.executionStepLog.create({
+        data: { runId, checklistItemId, done },
+      });
 
-    const logs = await prisma.executionStepLog.findMany({
-      where: { runId },
-      orderBy: { toggledAt: "desc" },
-    });
+      const run = await tx.executionRun.findUnique({
+        where: { id: runId },
+        include: { sop: { select: { dueDate: true } } },
+      });
+      if (!run) throw new Error("RUN_NOT_FOUND");
 
-    const latestStateByItem = new Map<string, boolean>();
-    for (const log of logs) {
-      if (!latestStateByItem.has(log.checklistItemId)) {
-        latestStateByItem.set(log.checklistItemId, log.done);
+      const logs = await tx.executionStepLog.findMany({
+        where: { runId },
+        orderBy: { toggledAt: "desc" },
+        select: { checklistItemId: true, done: true },
+      });
+
+      const latestStateByItem = new Map<string, boolean>();
+      for (const log of logs) {
+        if (!latestStateByItem.has(log.checklistItemId)) {
+          latestStateByItem.set(log.checklistItemId, log.done);
+        }
       }
-    }
-    const completedItems = [...latestStateByItem.values()].filter(Boolean).length;
+      const completedItems = [...latestStateByItem.values()].filter(Boolean).length;
 
-    const isNowComplete = completedItems >= run.totalItems && run.totalItems > 0;
-    const isOverdue =
-      !isNowComplete &&
-      run.sop.dueDate !== null &&
-      new Date() > run.sop.dueDate;
+      const isNowComplete = completedItems >= run.totalItems && run.totalItems > 0;
+      const isOverdue =
+        !isNowComplete &&
+        run.sop.dueDate !== null &&
+        new Date() > run.sop.dueDate;
 
-    const updated = await prisma.executionRun.update({
-      where: { id: runId },
-      data: {
-        completedItems,
-        status: isNowComplete ? "completed" : isOverdue ? "overdue" : "in_progress",
-        completedAt: isNowComplete ? new Date() : null,
-      },
+      return tx.executionRun.update({
+        where: { id: runId },
+        data: {
+          completedItems,
+          status: isNowComplete ? "completed" : isOverdue ? "overdue" : "in_progress",
+          completedAt: isNowComplete ? new Date() : null,
+        },
+      });
+    }, {
+      isolationLevel: "Serializable",
     });
 
     return NextResponse.json(updated);
-  } catch (err) {
+  } catch (err: any) {
+    if (err.message === "RUN_NOT_FOUND") {
+      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    }
+    
     console.error("[execution/tick] error:", err);
     return NextResponse.json(
-      { error: "Failed to update checklist item" },
-      { status: 500 }
+      { error: "Failed to update, please retry" },
+      { status: 409 }
     );
   }
 }

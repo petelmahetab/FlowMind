@@ -41,6 +41,7 @@ export async function GET(
   const totalRuns = runs.length;
   const completedRuns = runs.filter((r) => r.status === "completed").length;
   const inProgressRuns = runs.filter((r) => r.status === "in_progress").length;
+  const overdueRuns = runs.filter((r) => r.status === "overdue").length;
 
   const completionTimes = runs
     .filter((r) => r.completedAt)
@@ -69,10 +70,14 @@ export async function GET(
     }
   }
 
-  const stepBreakdown = Array.from(itemTickCounts.values()).map((entry) => ({
-    ...entry,
-    completionRate: totalRuns > 0 ? Math.round((entry.tickedCount / totalRuns) * 100) : 0,
-  }));
+  // 👇 Worst-completion-rate steps sabse upar — manager ko turant pata
+  // chalna chahiye kahan sabse zyada dikkat hai, alphabetical/step-order nahi
+  const stepBreakdown = Array.from(itemTickCounts.values())
+    .map((entry) => ({
+      ...entry,
+      completionRate: totalRuns > 0 ? Math.round((entry.tickedCount / totalRuns) * 100) : 0,
+    }))
+    .sort((a, b) => a.completionRate - b.completionRate);
 
   return NextResponse.json({
     sop: { title: sop.title, description: sop.description, createdAt: sop.createdAt },
@@ -80,6 +85,7 @@ export async function GET(
       totalRuns,
       completedRuns,
       inProgressRuns,
+      overdueRuns,
       avgCompletionMins,
     },
     stepBreakdown,

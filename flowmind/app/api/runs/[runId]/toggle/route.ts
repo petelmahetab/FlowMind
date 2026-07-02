@@ -8,39 +8,58 @@ export async function POST(
   const { runId } = await params;
   const { checklistItemId, done } = await req.json();
 
-  // Log entry banao — audit trail ke liye
-  await prisma.executionStepLog.create({
-    data: { runId, checklistItemId, done },
-  });
-
-  // Run ke completedItems count update karo
-  const run = await prisma.executionRun.findUnique({ where: { id: runId } });
-  if (!run) return NextResponse.json({ error: "Run not found" }, { status: 404 });
-
-  // Distinct completed items count karo (latest state per item)
-  const allLogs = await prisma.executionStepLog.findMany({
-    where: { runId },
-    orderBy: { toggledAt: "desc" },
-  });
-
-  const latestStatePerItem = new Map<string, boolean>();
-  for (const log of allLogs) {
-    if (!latestStatePerItem.has(log.checklistItemId)) {
-      latestStatePerItem.set(log.checklistItemId, log.done);
-    }
+  if (!checklistItemId || typeof done !== "boolean") {
+    return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
 
-  const completedItems = Array.from(latestStatePerItem.values()).filter(Boolean).length;
-  const isAllDone = completedItems === run.totalItems && run.totalItems > 0;
+  try {
+    const updatedRun = await prisma.$transaction(
+      async (tx) => {
+        // 1. Log entry banao (audit trail)
+        await tx.executionStepLog.create({
+          data: { runId, checklistItemId, done },
+        });
 
-  const updatedRun = await prisma.executionRun.update({
-    where: { id: runId },
-    data: {
-      completedItems,
-      status: isAllDone ? "completed" : "in_progress",
-      completedAt: isAllDone ? new Date() : null,
-    },
-  });
+        const run = await tx.executionRun.findUnique({ where: { id: runId } });
+        if (!run) throw new Error("RUN_NOT_FOUND");
 
-  return NextResponse.json(updatedRun);
+        // 2. Completed count — ab poore logs JS mein fetch-process nahi karte,
+        // seedha SQL se "har item ka latest toggle state" nikालते hain.
+        // Yeh transaction ke andar bahut kam time leta hai (lock jaldi release hoti hai).
+        const rows = await tx.$queryRaw<{ checklist_item_id: string; done: boolean }[]>`
+          SELECT DISTINCT ON ("checklistItemId") "checklistItemId" as checklist_item_id, "done"
+          FROM "ExecutionStepLog"
+          WHERE "runId" = ${runId}
+          ORDER BY "checklistItemId", "toggledAt" DESC
+        `;
+        const completedItems = rows.filter((r) => r.done).length;
+
+        const isAllDone = completedItems === run.totalItems && run.totalItems > 0;
+
+        return tx.executionRun.update({
+          where: { id: runId },
+          data: {
+            completedItems,
+            status: isAllDone ? "completed" : "in_progress",
+            completedAt: isAllDone ? new Date() : null,
+          },
+        });
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000,
+      }
+    );
+
+    return NextResponse.json(updatedRun);
+  } catch (err: any) {
+    if (err.message === "RUN_NOT_FOUND") {
+      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    }
+    console.error("[runs/toggle] error:", err);
+    return NextResponse.json(
+      { error: "Failed to update, please retry" },
+      { status: 409 }
+    );
+  }
 }

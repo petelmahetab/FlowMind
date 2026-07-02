@@ -11,6 +11,7 @@ import {
   Clock,
   CheckCircle2,
   Circle,
+  Loader2,
 } from "lucide-react";
 import type { Step, ChecklistItem } from "@prisma/client";
 
@@ -19,14 +20,22 @@ type StepWithChecklist = Step & { checklistItems: ChecklistItem[] };
 type Props = {
   step: StepWithChecklist;
   index: number;
-  onChecklistToggle: (stepId: string, itemId: string, done: boolean) => void;
+  onChecklistToggle: (stepId: string, itemId: string) => void;
+  // 👇 Single source of truth ab yeh hai — useExecutionRun hook se aata hai
+  completedItemIds: Set<string>;
+  togglingId: string | null;
+  disabled: boolean;
 };
 
-export default function StepItem({ step, index, onChecklistToggle }: Props) {
+export default function StepItem({
+  step,
+  index,
+  onChecklistToggle,
+  completedItemIds,
+  togglingId,
+  disabled,
+}: Props) {
   const [expanded, setExpanded] = useState(true);
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(
-    Object.fromEntries(step.checklistItems.map((i) => [i.id, i.done]))
-  );
 
   const {
     attributes,
@@ -44,12 +53,15 @@ export default function StepItem({ step, index, onChecklistToggle }: Props) {
   };
 
   function handleCheck(itemId: string) {
-    const newVal = !checkedItems[itemId];
-    setCheckedItems((prev) => ({ ...prev, [itemId]: newVal }));
-    onChecklistToggle(step.id, itemId, newVal);
+    if (disabled) return;
+    // Ab koi local state nahi — seedha parent ke through hook ko batao.
+    // Optimistic update, queueing, sab hook ke andar hi handle hota hai.
+    onChecklistToggle(step.id, itemId);
   }
 
-  const doneCount = Object.values(checkedItems).filter(Boolean).length;
+  const doneCount = step.checklistItems.filter((i) =>
+    completedItemIds.has(i.id)
+  ).length;
   const totalCount = step.checklistItems.length;
 
   return (
@@ -123,28 +135,38 @@ export default function StepItem({ step, index, onChecklistToggle }: Props) {
           {/* Checklist */}
           {step.checklistItems.length > 0 && (
             <div className="space-y-2">
-              {step.checklistItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => handleCheck(item.id)}
-                  className="flex items-center gap-2 w-full text-left group"
-                >
-                  {checkedItems[item.id] ? (
-                    <CheckCircle2 className="w-4 h-4 text-indigo-500 flex-shrink-0" />
-                  ) : (
-                    <Circle className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 flex-shrink-0 transition-colors" />
-                  )}
-                  <span
-                    className={`text-sm transition-colors ${
-                      checkedItems[item.id]
-                        ? "line-through text-gray-300"
-                        : "text-gray-700"
-                    }`}
+              {step.checklistItems.map((item) => {
+                const isDone = completedItemIds.has(item.id);
+                const isSyncing = togglingId === item.id;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleCheck(item.id)}
+                    disabled={disabled}
+                    className="flex items-center gap-2 w-full text-left group disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {item.text}
-                  </span>
-                </button>
-              ))}
+                    {isSyncing ? (
+                      // 👇 Chhota subtle spinner — sirf is item ke liye,
+                      // baaki saare checkboxes turant clickable rehte hain
+                      <Loader2 className="w-4 h-4 text-indigo-400 flex-shrink-0 animate-spin" />
+                    ) : isDone ? (
+                      <CheckCircle2 className="w-4 h-4 text-indigo-500 flex-shrink-0" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-gray-300 group-hover:text-indigo-400 flex-shrink-0 transition-colors" />
+                    )}
+                    <span
+                      className={`text-sm transition-colors ${
+                        isDone
+                          ? "line-through text-gray-300"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      {item.text}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

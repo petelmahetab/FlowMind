@@ -14,3 +14,9 @@ export type ApiError = {
   error: string;
   message?: string;
 };
+
+export type Branch = {
+  condition: string;
+  nextStepOrder: number;
+  label: string;
+};

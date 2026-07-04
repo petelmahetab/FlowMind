@@ -68,6 +68,7 @@ export async function POST(req: Request) {
             owner: step.owner ?? null,
             durationMins: step.durationMins ?? null,
             order: stepIndex,
+            branches: step.branches ?? null,
             checklistItems: {
               create: step.checklistItems.map((item, itemIndex) => ({
                 text: item.text,

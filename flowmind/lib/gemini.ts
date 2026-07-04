@@ -4,6 +4,12 @@ const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 
+export type Branch = {
+  condition: string;
+  nextStepOrder: number;
+  label: string;
+};
+
 export type GeneratedSop = {
   title: string;
   description: string;
@@ -12,6 +18,7 @@ export type GeneratedSop = {
     description: string;
     owner?: string;
     durationMins?: number;
+    branches: Branch[] | null;
     checklistItems: { text: string }[];
   }[];
 };
@@ -20,20 +27,21 @@ export async function generateSopFromText(
   rawText: string
 ): Promise<GeneratedSop> {
   const prompt = `
-You are an expert at turning messy process descriptions into clean, structured Standard Operating Procedures (SOPs).
+You are an expert at turning messy process descriptions into structured SOPs.
 
 Respond with ONLY valid JSON. No markdown, no backticks, no explanation.
 
 JSON format:
 {
-  "title": "short title max 8 words",
-  "description": "one sentence describing this SOP",
+  "title": "max 8 word title",
+  "description": "one sentence description",
   "steps": [
     {
       "title": "action-oriented step title",
       "description": "what to do and why",
       "owner": "Developer",
       "durationMins": 10,
+      "branches": null,
       "checklistItems": [
         { "text": "specific sub-task" },
         { "text": "another sub-task" }
@@ -42,11 +50,19 @@ JSON format:
   ]
 }
 
-Rules:
-- 3 to 8 steps
-- 2 to 4 checklist items per step
+BRANCHING RULES — critical:
+- If a step contains words like "if", "agar", "else", "warna", "or", "depends on", "based on", "check if" — it is a branching step
+- For branching steps, set branches to an array:
+  "branches": [
+    { "condition": "if database issue", "nextStepOrder": 4, "label": "Database path" },
+    { "condition": "if network issue", "nextStepOrder": 6, "label": "Network path" },
+    { "condition": "else", "nextStepOrder": 8, "label": "Escalate path" }
+  ]
+- nextStepOrder is the 1-based position of the step to jump to
+- Non-branching steps MUST have "branches": null
+- 3 to 8 steps total, 2 to 4 checklist items per step
 - Use imperative verbs
-- ONLY return JSON, nothing else
+- ONLY return JSON
 
 User's process:
 """

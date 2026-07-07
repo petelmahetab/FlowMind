@@ -1,178 +1,169 @@
-<div align="center">
+# FlowMind
 
-# ⚡ FlowMind
+**Turn messy processes into trackable, shareable Standard Operating Procedures (SOPs).**
 
-### Turn messy processes into clear SOPs — instantly.
-
-Describe any workflow in plain English. AI structures it into a shareable, interactive runbook with steps, owners, and checklists.
-
-[![Next.js](https://img.shields.io/badge/Next.js_15-black?style=for-the-badge&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://typescriptlang.org)
-[![Prisma](https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma)](https://prisma.io)
-[![Clerk](https://img.shields.io/badge/Clerk-6C47FF?style=for-the-badge&logo=clerk&logoColor=white)](https://clerk.com)
-
-[Live Demo](https://flowmind.vercel.app) · [Report Bug](https://github.com/yourusername/flowmind/issues) · [Request Feature](https://github.com/yourusername/flowmind/issues)
-
-</div>
+FlowMind lets teams generate, organize, execute, and audit SOPs with real-time progress tracking, public sharing, assignments, and PDF exports.
 
 ---
 
-## The Problem
+## ✨ Features
 
-Every team has critical processes that live in someone's head or a messy chat message. When that person leaves — the knowledge walks out with them.
-
-**FlowMind fixes this.** Describe your process once. AI turns it into a structured SOP your whole team can follow, tick off, and share.
-
----
-
-## Features
-
-- 🤖 **AI Generation** — Plain English in, structured SOP out (Gemini 2.0 Flash)
-- ✅ **Interactive Checklists** — Tick off steps as you work
-- 🔗 **Public Share Links** — One click to share a read-only runbook
-- 🔀 **Drag & Drop** — Reorder steps however you need
-- 🌙 **Dark / Light / Auto** — System-aware theme toggle
-- 🔒 **Freemium Gating** — 3 SOPs free, upgrade for unlimited
+- **AI-assisted SOP generation** — turn raw text/notes into structured, step-by-step SOPs
+- **Step & checklist tracking** — break SOPs into steps with checklist items and conditional branching
+- **Execution runs** — track live progress as someone works through an SOP, with completion percentage
+- **Public sharing** — share SOPs via a public link (`/sop/[slug]`) without requiring login
+- **Assignments** — assign SOPs to team members with due dates and status tracking
+- **Audit reports** — generate a full audit trail of SOP executions
+- **PDF export** — export any SOP as a polished PDF
+- **Authentication** — secure sign-in/sign-up via Clerk
+- **Background jobs** — event-driven workflows powered by Inngest
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
-| | Tool | Purpose |
-|---|---|---|
-| **Framework** | Next.js 15 App Router | Full-stack, server components |
-| **Auth** | Clerk | OAuth, webhooks, user sync |
-| **Database** | PostgreSQL + Supabase | Managed, free tier |
-| **ORM** | Prisma | Type-safe queries |
-| **AI** | Gemini 2.0 Flash | Free, structured JSON output |
-| **Data Fetching** | TanStack Query | Client cache + invalidation |
-| **Drag & Drop** | dnd-kit | Step reordering |
-| **Background Jobs** | Inngest | Async welcome emails |
-| **Email** | Resend | Transactional, 3k free/mo |
-| **Deploy** | Vercel | Zero config, free tier |
+| Layer | Technology |
+|---|---|
+| Framework | [Next.js 15](https://nextjs.org/) (App Router) |
+| Language | TypeScript |
+| Database | PostgreSQL (via [Supabase](https://supabase.com/)) |
+| ORM | [Prisma](https://www.prisma.io/) |
+| Auth | [Clerk](https://clerk.com/) |
+| Styling | Tailwind CSS + Radix UI |
+| Data fetching | TanStack Query |
+| Background jobs | [Inngest](https://www.inngest.com/) |
+| AI | Google Generative AI, Groq SDK |
+| Email | [Resend](https://resend.com/) |
+| PDF generation | jsPDF + html2canvas |
+| Deployment | [Vercel](https://vercel.com/) |
 
 ---
 
-## Getting Started
+## 📋 Prerequisites
 
-### Prerequisites
-- Node.js 18+
-- Accounts on: [Supabase](https://supabase.com) · [Clerk](https://clerk.com) · [Google AI Studio](https://aistudio.google.com) · [Resend](https://resend.com)
+- Node.js 20+
+- npm
+- A [Supabase](https://supabase.com/) (or any PostgreSQL) database
+- A [Clerk](https://clerk.com/) account for authentication
+- API keys for any AI providers you plan to use (Google Generative AI / Groq)
 
-### Installation
+---
 
-```bash
-git clone https://github.com/yourusername/flowmind.git
-cd flowmind
-npm install --legacy-peer-deps
-```
+## ⚙️ Environment Variables
 
-### Environment Setup
-
-Create `.env.local` in the root:
+Create a `.env` file in the project root:
 
 ```env
-# Supabase — Settings → Database → Connection string
-DATABASE_URL="postgresql://postgres.[ref]:[password]@pooler.supabase.com:6543/postgres?pgbouncer=true"
-DIRECT_URL="postgresql://postgres.[ref]:[password]@pooler.supabase.com:5432/postgres"
+# Database (use the Supabase "Session" pooler on port 5432 for Prisma compatibility)
+DATABASE_URL="postgresql://<user>:<password>@<host>:5432/postgres?pgbouncer=true&connection_limit=1"
+DIRECT_URL="postgresql://<user>:<password>@<host>:5432/postgres"
 
-# Clerk — dashboard.clerk.com → API Keys
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
-CLERK_SECRET_KEY=sk_test_xxx
-CLERK_WEBHOOK_SECRET=whsec_xxx
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+CLERK_WEBHOOK_SIGNING_SECRET=
 
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+# AI providers
+GOOGLE_GENERATIVE_AI_API_KEY=
+GROQ_API_KEY=
 
-# Gemini — aistudio.google.com (free)
-GEMINI_API_KEY=AIzaSy_xxx
+# Email
+RESEND_API_KEY=
 
-# Resend — resend.com
-RESEND_API_KEY=re_xxx
-
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+# Inngest
+INNGEST_EVENT_KEY=
+INNGEST_SIGNING_KEY=
 ```
 
-### Run
+> ⚠️ **Never commit `.env` to version control.** Rotate any credentials that have been shared or exposed.
+
+---
+
+## 🚀 Getting Started
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/petelmahetab/FlowMind.git
+cd FlowMind
+
+# 2. Install dependencies
+npm install --legacy-peer-deps
+
+# 3. Set up environment variables
+cp .env.example .env
+# then fill in the values above
+
+# 4. Generate Prisma client and push schema to your database
 npx prisma generate
 npx prisma db push
+
+# 5. Run the development server
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Visit [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## Project Structure
+## 📜 Available Scripts
 
-```
-flowmind/
-├── app/
-│   ├── (auth)/              # Sign in / Sign up
-│   ├── dashboard/           # Protected workspace
-│   │   └── sop/[id]/        # SOP editor
-│   ├── sop/[slug]/          # Public share page
-│   └── api/
-│       ├── generate/        # Gemini AI call
-│       ├── sop/             # CRUD routes
-│       ├── user/me/         # Plan + usage
-│       ├── webhooks/clerk/  # User sync
-│       └── inngest/         # Background jobs
-├── components/
-│   └── sop/                 # Editor, modals, steps
-├── lib/
-│   ├── gemini.ts            # AI generation
-│   ├── prisma.ts            # DB singleton
-│   └── inngest.ts           # Background jobs
-├── hooks/
-│   └── usePlan.ts           # Freemium gate
-└── prisma/
-    └── schema.prisma        # DB schema
-```
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the development server |
+| `npm run build` | Build for production (`prisma generate && next build`) |
+| `npm run start` | Start the production server |
+| `npm run lint` | Run ESLint |
+| `npm run db:push` | Push Prisma schema changes to the database |
+| `npm run db:studio` | Open Prisma Studio |
+| `npm run db:generate` | Regenerate the Prisma client |
 
 ---
 
-## Database Schema
+## 🗄 Database Schema (Overview)
 
-```
-User ──< Sop ──< Step ──< ChecklistItem
-```
+- **User** — synced from Clerk, owns SOPs
+- **Sop** — the SOP itself (title, description, raw text, public share slug)
+- **Step** — ordered steps within an SOP, supports conditional branching
+- **ChecklistItem** — checkbox items within a step
+- **ExecutionRun** — a tracked run of an SOP by an executor
+- **ExecutionStepLog** — log of checklist items completed during a run
+- **SopAssignment** — assigns an SOP from one user to another with a due date
 
-- `User` — synced from Clerk via webhook, holds `plan` (free/pro)
-- `Sop` — title, rawText, shareSlug, isPublic
-- `Step` — title, description, owner, durationMins, order
-- `ChecklistItem` — text, done, order
-
----
-
-## Deployment
-
-```bash
-# Push to GitHub, then:
-# 1. vercel.com → New Project → Import repo
-# 2. Add all env variables
-# 3. Deploy
-
-# Update Clerk webhook URL to:
-# https://your-app.vercel.app/api/webhooks/clerk
-```
+Run `npx prisma studio` to explore the schema visually.
 
 ---
 
-## Roadmap
+## 🌐 Deployment (Vercel)
 
-- [ ] Mermaid flowchart auto-generation
-- [ ] PDF / Markdown export
-- [ ] Team workspaces with role-based access
-- [ ] Inline AI step improver
-- [ ] Stripe billing integration
+1. Push your code to GitHub.
+2. Import the repo into [Vercel](https://vercel.com/new).
+3. Add all environment variables listed above under **Project Settings → Environment Variables** (set for Production).
+4. Use the **Session mode** Supabase connection string (port `5432`) for `DATABASE_URL` — the Transaction mode pooler (port `6543`) can cause `prepared statement already exists` errors with Prisma in serverless environments.
+5. Deploy. Vercel will run `prisma generate && next build` automatically.
+
+### Production checklist
+
+- [ ] `next` is on a patched, non-vulnerable version
+- [ ] `DATABASE_URL` uses the Session pooler (port 5432) with `pgbouncer=true&connection_limit=1`
+- [ ] `DIRECT_URL` is set for migrations
+- [ ] All secrets are set in Vercel (not committed to git)
+- [ ] Clerk webhook endpoint is configured and verified
+- [ ] `npm audit` has no unresolved critical/high vulnerabilities
 
 ---
 
-## License
+## 🔒 Security
 
-MIT © [Mahetab Patel](https://github.com/petelmahetab)
+- Never commit `.env` files or API keys.
+- Rotate database and third-party credentials if they are ever exposed (e.g. pasted in chat, logs, or committed by mistake).
+- Keep Next.js and dependencies patched — check `npm audit` and framework security advisories regularly.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes
+4. Open a pull request
+

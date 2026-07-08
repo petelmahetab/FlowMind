@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { SOP_TEMPLATES } from "@/lib/templates";
-import { generateSlug } from "@/lib/utils";   // ← Yeh import add karo
+import { generateSlug } from "@/lib/utils";   
 
 export async function GET() {
   const { userId } = await auth();
@@ -54,7 +54,11 @@ export async function POST(req: Request) {
             durationMins: parseInt(step.duration) || null,
             order: step.order,
             checklistItems: {
-              create: []
+              create: step.checklistItems.map((text, idx) => ({
+                text,
+                done: false,
+                order: idx,
+              })),
             },
           })),
         },

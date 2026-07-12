@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -25,7 +23,9 @@ import {
   Check,
   CheckCircle2,
   Circle,
-  Users,FileBarChart
+  Users,
+  FileBarChart,
+  Brain,
 } from "lucide-react";
 import StepItem from "./StepItem";
 import { useExecutionRun } from "@/hooks/useExecutionRun";
@@ -34,6 +34,7 @@ import RunsAnalytics from "./RunsAnalytics";
 import ExportButton from "./ExportButton";
 import type { SopWithSteps } from "@/types";
 import AuditReportModal from "./AuditReportModal";
+import SopHealthAnalyzer from "./SopHealthAnalyzer";
 
 type Props = {
   initialSop: SopWithSteps;
@@ -46,8 +47,8 @@ export default function SopEditorClient({ initialSop }: Props) {
   const [copied, setCopied] = useState(false);
   const [togglingPublic, setTogglingPublic] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
-
   const [showAuditReport, setShowAuditReport] = useState(false);
+  const [showHealthAnalyzer, setShowHealthAnalyzer] = useState(false);
 
   const totalChecklistItems = steps.reduce(
     (sum, step) => sum + step.checklistItems.length,
@@ -105,7 +106,6 @@ export default function SopEditorClient({ initialSop }: Props) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  // 👇 Checklist item toggle — ab execution run ke through hota hai
   const handleChecklistToggle = useCallback(
     (stepId: string, itemId: string) => {
       if (!hasStartedRun) return;
@@ -118,25 +118,30 @@ export default function SopEditorClient({ initialSop }: Props) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Top bar */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
+
+          {/* Back button */}
           <button
             onClick={() => router.push("/dashboard")}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 transition-colors flex-shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            Dashboard
+            <span className="hidden sm:inline">Dashboard</span>
           </button>
 
-          <h1 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm flex-1 text-center">
+          {/* Title */}
+          <h1 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm flex-1 text-center px-2">
             {sop.title}
           </h1>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          {/* Action buttons */}
+          <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto max-w-[60vw] sm:max-w-none scrollbar-hide">
+
             {/* Public/Private toggle */}
             <button
               onClick={togglePublic}
               disabled={togglingPublic}
-              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
                 sop.isPublic
                   ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
                   : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100"
@@ -144,51 +149,67 @@ export default function SopEditorClient({ initialSop }: Props) {
             >
               {sop.isPublic ? (
                 <>
-                  <Globe className="w-3 h-3" /> Public
+                  <Globe className="w-3 h-3 flex-shrink-0" />
+                  <span className="hidden sm:inline ml-1">Public</span>
                 </>
               ) : (
                 <>
-                  <Lock className="w-3 h-3" /> Private
+                  <Lock className="w-3 h-3 flex-shrink-0" />
+                  <span className="hidden sm:inline ml-1">Private</span>
                 </>
               )}
             </button>
 
-            {/* Copy link */}
+            {/* Copy link — only when public */}
             {sop.isPublic && (
               <button
                 onClick={copyShareLink}
-                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors"
+                className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 {copied ? (
                   <>
-                    <Check className="w-3 h-3" /> Copied!
+                    <Check className="w-3 h-3 flex-shrink-0" />
+                    <span className="hidden sm:inline ml-1">Copied!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="w-3 h-3" /> Copy link
+                    <Copy className="w-3 h-3 flex-shrink-0" />
+                    <span className="hidden sm:inline ml-1">Copy</span>
                   </>
                 )}
               </button>
             )}
 
             {/* Export PDF */}
-            <ExportButton sop={{ ...sop, steps }} />
+            <div className="flex-shrink-0">
+              <ExportButton sop={{ ...sop, steps }} />
+            </div>
 
-            {/* 👇 Execution analytics — kaun follow kar raha hai */}
+            {/* Activity */}
             <button
               onClick={() => setShowAnalytics((p) => !p)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
             >
-              <Users className="w-3 h-3" />
-              Activity
+              <Users className="w-3 h-3 flex-shrink-0" />
+              <span className="hidden sm:inline ml-1">Activity</span>
             </button>
 
+            {/* Audit Report */}
             <button
               onClick={() => setShowAuditReport(true)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
             >
-              <FileBarChart className="w-3 h-3" />
-              Audit Report
+              <FileBarChart className="w-3 h-3 flex-shrink-0" />
+              <span className="hidden sm:inline ml-1">Audit</span>
+            </button>
+
+            {/* AI Analyze */}
+            <button
+              onClick={() => setShowHealthAnalyzer(true)}
+              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors whitespace-nowrap flex-shrink-0"
+            >
+              <Brain className="w-3 h-3 flex-shrink-0" />
+              <span className="hidden sm:inline ml-1">AI Analyze</span>
             </button>
           </div>
         </div>
@@ -212,15 +233,15 @@ export default function SopEditorClient({ initialSop }: Props) {
           </p>
         </div>
 
-        {/* 👇 Execution analytics panel — toggle se khulta hai */}
+        {/* Execution analytics panel */}
         {showAnalytics && <RunsAnalytics sopId={sop.id} />}
 
-        {/* 👇 Start run prompt — jab tak run start nahi hua */}
+        {/* Start run prompt */}
         {!hasStartedRun && totalChecklistItems > 0 && (
           <StartRunModal onStart={startRun} />
         )}
 
-        {/* Progress bar — sirf run start hone ke baad dikhega */}
+        {/* Progress bar */}
         {hasStartedRun && (
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
             <div className="flex items-center justify-between mb-2">
@@ -249,7 +270,7 @@ export default function SopEditorClient({ initialSop }: Props) {
             </div>
             {isAllComplete && (
               <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                🎉 SOP fully completed — great work!
+                SOP fully completed — great work!
               </p>
             )}
           </div>
@@ -299,16 +320,25 @@ export default function SopEditorClient({ initialSop }: Props) {
                   />
                 </div>
               ))}
-              {showAuditReport && (
-                <AuditReportModal
-                  sopId={sop.id}
-                  onClose={() => setShowAuditReport(false)}
-                />
-              )}
             </div>
           </SortableContext>
         </DndContext>
       </div>
+
+      {/* Modals */}
+      {showAuditReport && (
+        <AuditReportModal
+          sopId={sop.id}
+          onClose={() => setShowAuditReport(false)}
+        />
+      )}
+
+      {showHealthAnalyzer && (
+        <SopHealthAnalyzer
+          sopId={sop.id}
+          onClose={() => setShowHealthAnalyzer(false)}
+        />
+      )}
     </div>
   );
 }

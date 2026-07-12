@@ -3,17 +3,17 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const sop = await prisma.sop.findUnique({
-    where: { id: "cmqs8qy580001cmdc86g07h7i" },
+  const sop = await prisma.sop.findFirst({
+    orderBy: { createdAt: "desc" },
     include: {
       steps: {
-        include: { checklistItems: true }
-      }
-    }
+        include: { checklistItems: true },
+        orderBy: { order: "asc" },
+      },
+    },
   });
 
-  console.log("SOP found:", sop?.title);
-  console.log("Steps count:", sop?.steps.length);
+  console.log("Latest SOP:", sop?.title, "| id:", sop?.id, "| slug:", sop?.shareSlug, "| createdAt:", sop?.createdAt);
   sop?.steps.forEach(step => {
     console.log(`- ${step.title}: ${step.checklistItems.length} checklist items`);
   });

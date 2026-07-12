@@ -52,11 +52,7 @@ model Step {
   owner          String?
   durationMins   Int?
   order          Int
-
-  // Conditional branching — null matlab linear step, array matlab branching
-  // Format: [{ condition: "database issue", nextStepOrder: 5, label: "Go to DB fix" }]
   branches       Json?
-
   checklistItems ChecklistItem[]
   sop            Sop             @relation(fields: [sopId], references: [id], onDelete: Cascade)
 
@@ -134,4 +130,3 @@ enum RunStatus {
   completed
   overdue
 }
-

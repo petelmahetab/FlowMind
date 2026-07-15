@@ -20,6 +20,7 @@ model User {
   sops         Sop[]
   assignedByMe SopAssignment[] @relation("AssignedBy")
   assignedToMe SopAssignment[] @relation("AssignedTo")
+  webhooks     Webhook[]       // 👈 add
 
   @@index([clerkId])
 }
@@ -118,6 +119,37 @@ model SopAssignment {
 
   @@index([assignedToId])
   @@index([sopId])
+}
+
+// 👇 Feature 2 — Webhook System
+model Webhook {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  secret    String           // HMAC signing key
+  events    String[]         // ["sop.completed", "sop.started", "run.completed"]
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+}
+
+model WebhookDelivery {
+  id           String   @id @default(cuid())
+  webhookId    String
+  webhook      Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event        String   // "sop.completed"
+  payload      Json
+  statusCode   Int?
+  success      Boolean  @default(false)
+  attempts     Int      @default(0)
+  lastAttemptAt DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([webhookId])
 }
 
 enum Plan {

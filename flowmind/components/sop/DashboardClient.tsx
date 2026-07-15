@@ -4,19 +4,27 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { UserButton } from "@clerk/nextjs";
-import { Plus, FileText, Trash2, ChevronRight, Zap, AlertTriangle, LayoutTemplate } from "lucide-react"; 
+import {
+  Plus,
+  FileText,
+  Trash2,
+  ChevronRight,
+  Zap,
+  AlertTriangle,
+  LayoutTemplate,
+} from "lucide-react";
 import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
 import BrainDumpModal from "./BrainDumpModal";
 import UpgradeModal from "./UpgradeModal";
-import TemplateLibraryModal from "./TemplateLibraryModal"; 
+import TemplateLibraryModal from "./TemplateLibraryModal";
 import ThemeToggle from "@/components/ThemeToggle";
 import type { Sop } from "@prisma/client";
 import { FREE_LIMIT } from "@/lib/utils";
 import type { SopTemplate } from "@/lib/templates";
-// import MyAssignments from "./MyAssignments";
 import MyAssignments from "@/components/sop/MyAssignments";
-
+import WebhookManager from "./WebhookManager";
+import { Webhook } from "lucide-react";
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };
 type InitialUser = {
@@ -26,7 +34,11 @@ type InitialUser = {
   sops: SopWithStepCount[];
 };
 
-export default function DashboardClient({ initialUser }: { initialUser: InitialUser }) {
+export default function DashboardClient({
+  initialUser,
+}: {
+  initialUser: InitialUser;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { atLimit, plan, sopCount, remaining, isLoading } = usePlan();
@@ -34,9 +46,13 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
   const [sops, setSops] = useState<SopWithStepCount[]>(initialUser.sops);
   const [showBrainDump, setShowBrainDump] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false); // 👈 add
+  const [showTemplates, setShowTemplates] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<SopWithStepCount | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<SopWithStepCount | null>(
+    null,
+  );
+
+  const [showWebhooks, setShowWebhooks] = useState(false);
 
   function handleNewSop() {
     if (!isLoading && atLimit) {
@@ -120,6 +136,14 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
             </button>
           )}
           <UserButton afterSignOutUrl="/" />
+
+          <button
+            onClick={() => setShowWebhooks(true)}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Webhook className="w-3.5 h-3.5" />
+            Webhooks
+          </button>
         </div>
       </nav>
 
@@ -136,7 +160,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
                 : "Pro · unlimited SOPs"}
             </p>
           </div>
-          {/* 👇 Two buttons side by side */}
+          {/*  Two buttons side by side */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTemplates(true)}
@@ -155,26 +179,34 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
           </div>
         </div>
 
-          <MyAssignments />
-
+        <MyAssignments />
 
         {/* Free tier progress bar */}
         {plan === "free" && (
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 mb-6">
             <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600 dark:text-gray-400">Free plan usage</span>
-              <span className="text-gray-500">{sopCount} / {FREE_LIMIT}</span>
+              <span className="text-gray-600 dark:text-gray-400">
+                Free plan usage
+              </span>
+              <span className="text-gray-500">
+                {sopCount} / {FREE_LIMIT}
+              </span>
             </div>
             <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
               <div
                 className="bg-indigo-600 h-2 rounded-full transition-all"
-                style={{ width: `${Math.min(100, (sopCount / FREE_LIMIT) * 100)}%` }}
+                style={{
+                  width: `${Math.min(100, (sopCount / FREE_LIMIT) * 100)}%`,
+                }}
               />
             </div>
             {atLimit && (
               <p className="text-xs text-amber-600 mt-2">
                 Limit reached.{" "}
-                <button onClick={() => setShowUpgrade(true)} className="underline">
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  className="underline"
+                >
                   Upgrade to Pro
                 </button>
               </p>
@@ -257,14 +289,17 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">Delete SOP?</p>
+                <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">
+                  Delete SOP?
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                   "{(deleteTarget as any).title ?? deleteTarget.id}"
                 </p>
               </div>
             </div>
             <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-              This will permanently delete the SOP and all its steps. This action cannot be undone.
+              This will permanently delete the SOP and all its steps. This
+              action cannot be undone.
             </p>
             <div className="flex gap-2">
               <button
@@ -297,6 +332,7 @@ export default function DashboardClient({ initialUser }: { initialUser: InitialU
         />
       )}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+        {showWebhooks && <WebhookManager onClose={() => setShowWebhooks(false)} />}
     </div>
   );
 }

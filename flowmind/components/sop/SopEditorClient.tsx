@@ -28,6 +28,8 @@ import {
   Users,
   FileBarChart,
   Brain,
+  Webhook,
+  Crown,
 } from "lucide-react";
 import StepItem from "./StepItem";
 import { useExecutionRun } from "@/hooks/useExecutionRun";
@@ -37,6 +39,9 @@ import ExportButton from "./ExportButton";
 import type { SopWithSteps } from "@/types";
 import AuditReportModal from "./AuditReportModal";
 import SopHealthAnalyzer from "./SopHealthAnalyzer";
+import WebhookManager from "./WebhookManager";
+import UpgradeModal from "./UpgradeModal";
+import { usePlan } from "@/hooks/usePlan";
 
 type Props = {
   initialSop: SopWithSteps;
@@ -51,6 +56,12 @@ export default function SopEditorClient({ initialSop }: Props) {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showAuditReport, setShowAuditReport] = useState(false);
   const [showHealthAnalyzer, setShowHealthAnalyzer] = useState(false);
+  const [showWebhooks, setShowWebhooks] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  // 👇 Plan check
+  const { plan, isLoading: planLoading } = usePlan();
+  const isPro = plan === "pro";
 
   const totalChecklistItems = steps.reduce(
     (sum, step) => sum + step.checklistItems.length,
@@ -108,6 +119,15 @@ export default function SopEditorClient({ initialSop }: Props) {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  // 👇 Pro feature click handler
+  function handleProFeature(action: () => void) {
+    if (!isPro) {
+      setShowUpgrade(true);
+      return;
+    }
+    action();
+  }
+
   const handleChecklistToggle = useCallback(
     (stepId: string, itemId: string) => {
       if (!hasStartedRun) return;
@@ -139,7 +159,7 @@ export default function SopEditorClient({ initialSop }: Props) {
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto max-w-[60vw] sm:max-w-none scrollbar-hide">
 
-            {/* Public/Private toggle */}
+            {/* Public/Private toggle — Free */}
             <button
               onClick={togglePublic}
               disabled={togglingPublic}
@@ -150,44 +170,32 @@ export default function SopEditorClient({ initialSop }: Props) {
               }`}
             >
               {sop.isPublic ? (
-                <>
-                  <Globe className="w-3 h-3 flex-shrink-0" />
-                  <span className="hidden sm:inline ml-1">Public</span>
-                </>
+                <><Globe className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Public</span></>
               ) : (
-                <>
-                  <Lock className="w-3 h-3 flex-shrink-0" />
-                  <span className="hidden sm:inline ml-1">Private</span>
-                </>
+                <><Lock className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Private</span></>
               )}
             </button>
 
-            {/* Copy link — only when public */}
+            {/* Copy link — Free */}
             {sop.isPublic && (
               <button
                 onClick={copyShareLink}
                 className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors whitespace-nowrap flex-shrink-0"
               >
                 {copied ? (
-                  <>
-                    <Check className="w-3 h-3 flex-shrink-0" />
-                    <span className="hidden sm:inline ml-1">Copied!</span>
-                  </>
+                  <><Check className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Copied!</span></>
                 ) : (
-                  <>
-                    <Copy className="w-3 h-3 flex-shrink-0" />
-                    <span className="hidden sm:inline ml-1">Copy</span>
-                  </>
+                  <><Copy className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Copy</span></>
                 )}
               </button>
             )}
 
-            {/* Export PDF */}
+            {/* Export PDF — Free */}
             <div className="flex-shrink-0">
               <ExportButton sop={{ ...sop, steps }} />
             </div>
 
-            {/* Activity */}
+            {/* Activity — Free */}
             <button
               onClick={() => setShowAnalytics((p) => !p)}
               className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
@@ -196,23 +204,53 @@ export default function SopEditorClient({ initialSop }: Props) {
               <span className="hidden sm:inline ml-1">Activity</span>
             </button>
 
-            {/* Audit Report */}
+            {/* Audit Report — PRO */}
             <button
-              onClick={() => setShowAuditReport(true)}
-              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
+              onClick={() => handleProFeature(() => setShowAuditReport(true))}
+              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
+                isPro
+                  ? "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+              }`}
             >
               <FileBarChart className="w-3 h-3 flex-shrink-0" />
               <span className="hidden sm:inline ml-1">Audit</span>
+              {!isPro && !planLoading && (
+                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
+              )}
             </button>
 
-            {/* AI Analyze */}
+            {/* AI Analyze — PRO */}
             <button
-              onClick={() => setShowHealthAnalyzer(true)}
-              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors whitespace-nowrap flex-shrink-0"
+              onClick={() => handleProFeature(() => setShowHealthAnalyzer(true))}
+              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
+                isPro
+                  ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
+                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+              }`}
             >
               <Brain className="w-3 h-3 flex-shrink-0" />
               <span className="hidden sm:inline ml-1">AI Analyze</span>
+              {!isPro && !planLoading && (
+                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
+              )}
             </button>
+
+            {/* Webhooks — PRO */}
+            {/* <button
+              onClick={() => handleProFeature(() => setShowWebhooks(true))}
+              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
+                isPro
+                  ? "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+              }`}
+            >
+              <Webhook className="w-3 h-3 flex-shrink-0" />
+              <span className="hidden sm:inline ml-1">Webhooks</span>
+              {!isPro && !planLoading && (
+                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
+              )}
+            </button> */}
           </div>
         </div>
       </div>
@@ -220,9 +258,17 @@ export default function SopEditorClient({ initialSop }: Props) {
       <div className="max-w-2xl mx-auto px-4 pt-8 pb-4">
         {/* SOP header card */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 mb-4">
-          <span className="text-xs text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded font-medium">
-            SOP
-          </span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-indigo-600 bg-indigo-50 dark:bg-indigo-950 px-2 py-0.5 rounded font-medium">
+              SOP
+            </span>
+            {isPro && (
+              <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                <Crown className="w-3 h-3" />
+                Pro
+              </span>
+            )}
+          </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mt-2">
             {sop.title}
           </h2>
@@ -329,17 +375,16 @@ export default function SopEditorClient({ initialSop }: Props) {
 
       {/* Modals */}
       {showAuditReport && (
-        <AuditReportModal
-          sopId={sop.id}
-          onClose={() => setShowAuditReport(false)}
-        />
+        <AuditReportModal sopId={sop.id} onClose={() => setShowAuditReport(false)} />
       )}
-
       {showHealthAnalyzer && (
-        <SopHealthAnalyzer
-          sopId={sop.id}
-          onClose={() => setShowHealthAnalyzer(false)}
-        />
+        <SopHealthAnalyzer sopId={sop.id} onClose={() => setShowHealthAnalyzer(false)} />
+      )}
+      {showWebhooks && (
+        <WebhookManager onClose={() => setShowWebhooks(false)} />
+      )}
+      {showUpgrade && (
+        <UpgradeModal onClose={() => setShowUpgrade(false)} />
       )}
     </div>
   );

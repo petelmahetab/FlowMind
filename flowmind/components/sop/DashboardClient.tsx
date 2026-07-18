@@ -24,7 +24,7 @@ import { FREE_LIMIT } from "@/lib/utils";
 import type { SopTemplate } from "@/lib/templates";
 import MyAssignments from "@/components/sop/MyAssignments";
 import WebhookManager from "./WebhookManager";
-import { Webhook } from "lucide-react";
+import { Webhook, Crown } from "lucide-react";
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };
 type InitialUser = {
@@ -61,7 +61,13 @@ export default function DashboardClient({
       setShowBrainDump(true);
     }
   }
-
+  function handleWebhooksClick() {
+    if (!isLoading && plan !== "pro") {
+      setShowUpgrade(true);
+    } else {
+      setShowWebhooks(true);
+    }
+  }
   async function handleUseTemplate(template: SopTemplate) {
     setShowTemplates(false);
     if (!isLoading && atLimit) {
@@ -123,9 +129,25 @@ export default function DashboardClient({
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Nav */}
       <nav className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center justify-between">
-        <span className="font-bold text-indigo-600 text-lg">FlowMind</span>
+        <span className="font-bold text-xl cursor-pointer bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent hover:scale-105 transition-all duration-300 inline-block">
+          FlowMind
+        </span>
         <div className="flex items-center gap-3">
           <ThemeToggle />
+          <button
+            onClick={handleWebhooksClick}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+              plan === "pro"
+                ? "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+                : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+            }`}
+          >
+            <Webhook className="w-3.5 h-3.5" />
+            Webhooks
+            {plan !== "pro" && !isLoading && (
+              <Crown className="w-3 h-3 ml-0.5" />
+            )}
+          </button>
           {plan === "free" && (
             <button
               onClick={() => setShowUpgrade(true)}
@@ -135,15 +157,8 @@ export default function DashboardClient({
               Upgrade to Pro
             </button>
           )}
-          <UserButton afterSignOutUrl="/" />
 
-          <button
-            onClick={() => setShowWebhooks(true)}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          >
-            <Webhook className="w-3.5 h-3.5" />
-            Webhooks
-          </button>
+          <UserButton afterSignOutUrl="/" />
         </div>
       </nav>
 
@@ -332,7 +347,9 @@ export default function DashboardClient({
         />
       )}
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
-        {showWebhooks && <WebhookManager onClose={() => setShowWebhooks(false)} />}
+      {showWebhooks && (
+        <WebhookManager onClose={() => setShowWebhooks(false)} />
+      )}
     </div>
   );
 }

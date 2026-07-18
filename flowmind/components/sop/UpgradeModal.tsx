@@ -1,11 +1,13 @@
 "use client";
 
-import { X, Zap, Check, ArrowRight, Crown } from "lucide-react";
+import { useState } from "react";
+import { X, Zap, Check, ArrowRight, Crown, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { FREE_LIMIT } from "@/lib/utils";
 
 type Props = {
   onClose: () => void;
-  reason?: "limit" | "feature"; 
+  reason?: "limit" | "feature";
 };
 
 const PRO_FEATURES = [
@@ -19,6 +21,26 @@ const PRO_FEATURES = [
 ];
 
 export default function UpgradeModal({ onClose, reason = "limit" }: Props) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleUpgrade() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/checkout", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to create checkout session");
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong starting checkout. Please try again.");
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-sm shadow-xl">
@@ -82,17 +104,21 @@ export default function UpgradeModal({ onClose, reason = "limit" }: Props) {
 
           {/* CTA */}
           <button
-            onClick={() => {
-              alert("Connect Stripe to enable payments — /api/checkout route needed.");
-            }}
-            className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-medium text-sm hover:bg-indigo-700 transition-colors"
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="mt-4 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-3 rounded-xl font-medium text-sm hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Zap className="w-4 h-4" />
-            Upgrade to Pro
-            <ArrowRight className="w-4 h-4" />
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Zap className="w-4 h-4" />
+            )}
+            {loading ? "Redirecting..." : "Upgrade to Pro"}
+            {!loading && <ArrowRight className="w-4 h-4" />}
           </button>
           <button
             onClick={onClose}
+            disabled={loading}
             className="mt-2 w-full text-sm text-gray-400 hover:text-gray-600 py-2"
           >
             Maybe later

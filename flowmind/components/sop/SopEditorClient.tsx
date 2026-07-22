@@ -28,8 +28,8 @@ import {
   Users,
   FileBarChart,
   Brain,
-  Webhook,
   Crown,
+  CalendarClock,
 } from "lucide-react";
 import StepItem from "./StepItem";
 import { useExecutionRun } from "@/hooks/useExecutionRun";
@@ -42,6 +42,8 @@ import SopHealthAnalyzer from "./SopHealthAnalyzer";
 import WebhookManager from "./WebhookManager";
 import UpgradeModal from "./UpgradeModal";
 import { usePlan } from "@/hooks/usePlan";
+import ScheduleManager from "./ScheduleManager";
+import NavPillButton from "./NavPillButton";
 
 type Props = {
   initialSop: SopWithSteps;
@@ -58,6 +60,7 @@ export default function SopEditorClient({ initialSop }: Props) {
   const [showHealthAnalyzer, setShowHealthAnalyzer] = useState(false);
   const [showWebhooks, setShowWebhooks] = useState(false);
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showScheduler, setShowScheduler] = useState(false);
 
   // 👇 Plan check
   const { plan, isLoading: planLoading } = usePlan();
@@ -140,8 +143,7 @@ export default function SopEditorClient({ initialSop }: Props) {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Top bar */}
       <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
-
+        <div className="max-w-4xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
           {/* Back button */}
           <button
             onClick={() => router.push("/dashboard")}
@@ -152,105 +154,68 @@ export default function SopEditorClient({ initialSop }: Props) {
           </button>
 
           {/* Title */}
-          <h1 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm flex-1 text-center px-2">
+          <h1 className="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm flex-1 min-w-0 text-center px-2 hidden md:block">
             {sop.title}
           </h1>
 
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 flex-shrink-0 overflow-x-auto max-w-[60vw] sm:max-w-none scrollbar-hide">
-
-            {/* Public/Private toggle — Free */}
-            <button
+            <NavPillButton
+              icon={sop.isPublic ? Globe : Lock}
+              label={sop.isPublic ? "Public" : "Private"}
               onClick={togglePublic}
-              disabled={togglingPublic}
-              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
-                sop.isPublic
-                  ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                  : "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100"
-              }`}
-            >
-              {sop.isPublic ? (
-                <><Globe className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Public</span></>
-              ) : (
-                <><Lock className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Private</span></>
-              )}
-            </button>
+              variant="neutral"
+            />
 
-            {/* Copy link — Free */}
             {sop.isPublic && (
               <button
                 onClick={copyShareLink}
-                className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 transition-colors whitespace-nowrap flex-shrink-0"
+                className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100 hover:-translate-y-0.5 active:scale-95 transition-all duration-300 whitespace-nowrap flex-shrink-0"
               >
                 {copied ? (
-                  <><Check className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Copied!</span></>
+                  <Check className="w-3.5 h-3.5" />
                 ) : (
-                  <><Copy className="w-3 h-3 flex-shrink-0" /><span className="hidden sm:inline ml-1">Copy</span></>
+                  <Copy className="w-3.5 h-3.5" />
                 )}
+                <span className="hidden sm:inline">
+                  {copied ? "Copied!" : "Copy"}
+                </span>
               </button>
             )}
 
-            {/* Export PDF — Free */}
             <div className="flex-shrink-0">
               <ExportButton sop={{ ...sop, steps }} />
             </div>
 
-            {/* Activity — Free */}
-            <button
+            <NavPillButton
+              icon={Users}
+              label="Activity"
               onClick={() => setShowAnalytics((p) => !p)}
-              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap flex-shrink-0"
-            >
-              <Users className="w-3 h-3 flex-shrink-0" />
-              <span className="hidden sm:inline ml-1">Activity</span>
-            </button>
+              variant="neutral"
+            />
 
-            {/* Audit Report — PRO */}
-            <button
+            <NavPillButton
+              icon={FileBarChart}
+              label="Audit"
               onClick={() => handleProFeature(() => setShowAuditReport(true))}
-              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
-                isPro
-                  ? "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-              }`}
-            >
-              <FileBarChart className="w-3 h-3 flex-shrink-0" />
-              <span className="hidden sm:inline ml-1">Audit</span>
-              {!isPro && !planLoading && (
-                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
-              )}
-            </button>
+              variant={isPro ? "proActive" : "proLocked"}
+            />
 
-            {/* AI Analyze — PRO */}
-            <button
-              onClick={() => handleProFeature(() => setShowHealthAnalyzer(true))}
-              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
-                isPro
-                  ? "bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
-                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-              }`}
-            >
-              <Brain className="w-3 h-3 flex-shrink-0" />
-              <span className="hidden sm:inline ml-1">AI Analyze</span>
-              {!isPro && !planLoading && (
-                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
-              )}
-            </button>
+            <NavPillButton
+              icon={CalendarClock}
+              label="Schedule"
+              onClick={() => handleProFeature(() => setShowScheduler(true))}
+              variant={isPro ? "proActive" : "proLocked"}
+            />
 
-            {/* Webhooks — PRO */}
-            {/* <button
-              onClick={() => handleProFeature(() => setShowWebhooks(true))}
-              className={`flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors whitespace-nowrap flex-shrink-0 ${
-                isPro
-                  ? "bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
-              }`}
-            >
-              <Webhook className="w-3 h-3 flex-shrink-0" />
-              <span className="hidden sm:inline ml-1">Webhooks</span>
-              {!isPro && !planLoading && (
-                <Crown className="w-3 h-3 ml-0.5 flex-shrink-0" />
-              )}
-            </button> */}
+            <NavPillButton
+              icon={Brain}
+              label="AI Analyze"
+              onClick={() =>
+                handleProFeature(() => setShowHealthAnalyzer(true))
+              }
+              variant={isPro ? "signature" : "proLocked"}
+            />
           </div>
         </div>
       </div>
@@ -375,16 +340,27 @@ export default function SopEditorClient({ initialSop }: Props) {
 
       {/* Modals */}
       {showAuditReport && (
-        <AuditReportModal sopId={sop.id} onClose={() => setShowAuditReport(false)} />
+        <AuditReportModal
+          sopId={sop.id}
+          onClose={() => setShowAuditReport(false)}
+        />
       )}
       {showHealthAnalyzer && (
-        <SopHealthAnalyzer sopId={sop.id} onClose={() => setShowHealthAnalyzer(false)} />
+        <SopHealthAnalyzer
+          sopId={sop.id}
+          onClose={() => setShowHealthAnalyzer(false)}
+        />
       )}
       {showWebhooks && (
         <WebhookManager onClose={() => setShowWebhooks(false)} />
       )}
-      {showUpgrade && (
-        <UpgradeModal onClose={() => setShowUpgrade(false)} />
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+
+      {showScheduler && (
+        <ScheduleManager
+          sopId={sop.id}
+          onClose={() => setShowScheduler(false)}
+        />
       )}
     </div>
   );

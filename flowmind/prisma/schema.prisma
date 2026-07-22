@@ -9,20 +9,20 @@ datasource db {
 }
 
 model User {
-  id           String          @id @default(cuid())
-  clerkId      String          @unique
-  email        String          @unique
-  name         String?
-  imageUrl     String?
-  plan         Plan            @default(free)
-  stripeCustomerId     String?   @unique   
-  stripeSubscriptionId String?   @unique 
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  sops         Sop[]
-  assignedByMe SopAssignment[] @relation("AssignedBy")
-  assignedToMe SopAssignment[] @relation("AssignedTo")
-  webhooks     Webhook[]       
+  id                    String          @id @default(cuid())
+  clerkId               String          @unique
+  email                 String          @unique
+  name                  String?
+  imageUrl              String?
+  plan                  Plan            @default(free)
+  stripeCustomerId      String?         @unique
+  stripeSubscriptionId  String?         @unique
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  sops                  Sop[]
+  assignedByMe          SopAssignment[] @relation("AssignedBy")
+  assignedToMe          SopAssignment[] @relation("AssignedTo")
+  webhooks              Webhook[]
 
   @@index([clerkId])
 }
@@ -42,6 +42,7 @@ model Sop {
   user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments   SopAssignment[]
   steps         Step[]
+  schedules     SopSchedule[]
 
   @@index([userId])
   @@index([shareSlug])
@@ -77,21 +78,26 @@ model ChecklistItem {
 model ExecutionRun {
   id             String             @id @default(cuid())
   sopId          String
+  scheduleId     String?
   executorEmail  String
   executorName   String?
   status         RunStatus          @default(in_progress)
   startedAt      DateTime           @default(now())
   completedAt    DateTime?
+  deadlineAt     DateTime?
+  remindedAt     DateTime?
   totalItems     Int                @default(0)
   completedItems Int                @default(0)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   sop            Sop                @relation(fields: [sopId], references: [id], onDelete: Cascade)
+  schedule       SopSchedule?       @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   stepLogs       ExecutionStepLog[]
 
   @@index([sopId])
   @@index([executorEmail])
   @@index([status])
+  @@index([deadlineAt])
 }
 
 model ExecutionStepLog {
@@ -123,35 +129,67 @@ model SopAssignment {
   @@index([sopId])
 }
 
-// 👇 Feature 2 — Webhook System
+
 model Webhook {
-  id        String           @id @default(cuid())
-  userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  url       String
-  secret    String           // HMAC signing key
-  events    String[]         // ["sop.completed", "sop.started", "run.completed"]
-  isActive  Boolean          @default(true)
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id         String            @id @default(cuid())
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url        String
+  secret     String            // HMAC signing key
+  events     String[]          // ["sop.completed", "sop.started", "run.completed"]
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
   deliveries WebhookDelivery[]
 
   @@index([userId])
 }
 
 model WebhookDelivery {
-  id           String   @id @default(cuid())
-  webhookId    String
-  webhook      Webhook  @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-  event        String   // "sop.completed"
-  payload      Json
-  statusCode   Int?
-  success      Boolean  @default(false)
-  attempts     Int      @default(0)
+  id            String    @id @default(cuid())
+  webhookId     String
+  webhook       Webhook   @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event         String    // "sop.completed"
+  payload       Json
+  statusCode    Int?
+  success       Boolean   @default(false)
+  attempts      Int       @default(0)
   lastAttemptAt DateTime?
-  createdAt    DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   @@index([webhookId])
+}
+
+
+model SopSchedule {
+  id             String         @id @default(cuid())
+  sopId          String
+  sop            Sop            @relation(fields: [sopId], references: [id], onDelete: Cascade)
+
+  
+  cronExpression String
+
+  
+  cronLabel      String
+
+ 
+  assigneeEmails String[]
+
+  
+  deadlineHours  Int            @default(24)
+
+  isActive       Boolean        @default(true)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime
+
+  executionRuns  ExecutionRun[]
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([sopId])
+  @@index([nextRunAt])
+  @@index([isActive])
 }
 
 enum Plan {

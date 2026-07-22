@@ -1,7 +1,18 @@
 import { serve } from "inngest/next";
-import { inngest, sendWelcomeEmail, deliverWebhookWithRetry } from "@/lib/inngest";
+import {
+  inngest,
+  sendWelcomeEmail,
+  deliverWebhookWithRetry,
+  checkDueSchedules,
+  sendDeadlineReminders,
+} from "@/lib/inngest";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [sendWelcomeEmail, deliverWebhookWithRetry],
+  functions: [
+    sendWelcomeEmail,
+    deliverWebhookWithRetry,
+    checkDueSchedules,
+    sendDeadlineReminders,
+  ],
 });

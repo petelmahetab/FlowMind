@@ -68,3 +68,50 @@
 .dark .bg-gray-100 {
   @apply bg-gray-800;
 }
+
+/* Shimmer sweep for locked pro features — signals "premium, tap to unlock" */
+.nav-pill-shimmer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgba(255, 255, 255, 0.5),
+    transparent
+  );
+  transform: skewX(-20deg);
+  transition: none;
+}
+.nav-pill-shimmer:hover::after {
+  animation: shimmer-sweep 0.9s ease;
+}
+@keyframes shimmer-sweep {
+  100% {
+    left: 125%;
+  }
+}
+
+/* Ambient pulse for the signature AI Analyze button */
+.nav-pill-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(99, 102, 241, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pill-shimmer::after,
+  .nav-pill-glow {
+    animation: none !important;
+  }
+}

@@ -12,6 +12,8 @@ import {
   Zap,
   AlertTriangle,
   LayoutTemplate,
+  Brain,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { usePlan } from "@/hooks/usePlan";
@@ -25,6 +27,7 @@ import type { SopTemplate } from "@/lib/templates";
 import MyAssignments from "@/components/sop/MyAssignments";
 import WebhookManager from "./WebhookManager";
 import { Webhook, Crown } from "lucide-react";
+import ProcessIntelligenceDashboard from "@/components/analytics/ProcessIntelligenceDashboard";
 
 type SopWithStepCount = Sop & { steps: { id: string }[] };
 type InitialUser = {
@@ -53,6 +56,7 @@ export default function DashboardClient({
   );
 
   const [showWebhooks, setShowWebhooks] = useState(false);
+  const [showIntelligence, setShowIntelligence] = useState(false);
 
   function handleNewSop() {
     if (!isLoading && atLimit) {
@@ -61,6 +65,7 @@ export default function DashboardClient({
       setShowBrainDump(true);
     }
   }
+
   function handleWebhooksClick() {
     if (!isLoading && plan !== "pro") {
       setShowUpgrade(true);
@@ -68,6 +73,15 @@ export default function DashboardClient({
       setShowWebhooks(true);
     }
   }
+
+  function handleIntelligenceClick() {
+    if (!isLoading && plan !== "pro") {
+      setShowUpgrade(true);
+    } else {
+      setShowIntelligence(true);
+    }
+  }
+
   async function handleUseTemplate(template: SopTemplate) {
     setShowTemplates(false);
     if (!isLoading && atLimit) {
@@ -193,6 +207,48 @@ export default function DashboardClient({
             </button>
           </div>
         </div>
+
+        {/* AI Process Intelligence — premium feature card */}
+        <button
+          onClick={handleIntelligenceClick}
+          className="group relative w-full mb-6 overflow-hidden rounded-2xl border transition-all duration-300 text-left
+            border-indigo-200 dark:border-indigo-900
+            bg-gradient-to-br from-indigo-50 via-purple-50 to-white
+            dark:from-indigo-950 dark:via-purple-950/40 dark:to-gray-900
+            hover:shadow-lg hover:shadow-indigo-100 dark:hover:shadow-indigo-950/50
+            hover:border-indigo-300 dark:hover:border-indigo-700"
+        >
+          {/* Decorative glow blob */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-400/20 rounded-full blur-3xl group-hover:bg-indigo-400/30 transition-all" />
+
+          <div className="relative flex items-center justify-between gap-4 px-5 py-4">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-300/50 dark:shadow-none group-hover:scale-105 transition-transform">
+                <Brain className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    AI Process Intelligence
+                  </p>
+                  {plan !== "pro" && (
+                    <span className="flex items-center gap-0.5 text-[10px] font-bold bg-gradient-to-r from-amber-400 to-orange-400 text-white px-1.5 py-0.5 rounded-full">
+                      <Crown className="w-2.5 h-2.5" />
+                      PRO
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
+                  See failure patterns, skipped steps &amp; team insights across all SOPs
+                </p>
+              </div>
+            </div>
+
+            <div className="flex-shrink-0 text-gray-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 group-hover:translate-x-0.5 transition-all">
+              <ArrowRight className="w-4.5 h-4.5" />
+            </div>
+          </div>
+        </button>
 
         <MyAssignments />
 
@@ -349,6 +405,12 @@ export default function DashboardClient({
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       {showWebhooks && (
         <WebhookManager onClose={() => setShowWebhooks(false)} />
+      )}
+
+      {showIntelligence && (
+        <ProcessIntelligenceDashboard
+          onClose={() => setShowIntelligence(false)}
+        />
       )}
     </div>
   );

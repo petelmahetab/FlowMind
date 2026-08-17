@@ -89,15 +89,32 @@ export async function GET(
       avgCompletionMins,
     },
     stepBreakdown,
-    runs: runs.map((r) => ({
-      id: r.id,
-      executorEmail: r.executorEmail,
-      executorName: r.executorName,
-      status: r.status,
-      startedAt: r.startedAt,
-      completedAt: r.completedAt,
-      completedItems: r.completedItems,
-      totalItems: r.totalItems,
-    })),
+    // 👇 NAYA — har run ke saath uske actual ticked/unticked checklist items bhi bhej rahe hain
+    runs: runs.map((r) => {
+      const latestStateByItem = new Map<string, boolean>();
+      for (const log of r.stepLogs) {
+        latestStateByItem.set(log.checklistItemId, log.done);
+      }
+
+      const checklistItems = sop.steps.flatMap((step) =>
+        step.checklistItems.map((item) => ({
+          text: item.text,
+          stepTitle: step.title,
+          ticked: latestStateByItem.get(item.id) ?? false,
+        }))
+      );
+
+      return {
+        id: r.id,
+        executorEmail: r.executorEmail,
+        executorName: r.executorName,
+        status: r.status,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+        completedItems: r.completedItems,
+        totalItems: r.totalItems,
+        checklistItems,
+      };
+    }),
   });
 }

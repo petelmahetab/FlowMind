@@ -5,6 +5,8 @@ import { X, FileBarChart, Download, Users, Clock, AlertTriangle, AlertOctagon } 
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 
+type ChecklistItem = { text: string; stepTitle: string; ticked: boolean };
+
 type AuditData = {
   sop: { title: string; description: string | null; createdAt: string };
   summary: {
@@ -24,6 +26,7 @@ type AuditData = {
     completedAt: string | null;
     completedItems: number;
     totalItems: number;
+    checklistItems: ChecklistItem[]; // 👈 NAYA
   }[];
 };
 
@@ -40,7 +43,6 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  // 👇 Ek hi jagah fetch logic — pehle yeh "Try again" button mein duplicate tha
   const loadReport = useCallback(() => {
     setLoading(true);
     setError(null);
@@ -65,8 +67,6 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
     loadReport();
   }, [loadReport]);
 
-  // Backend ab already completionRate ke hisaab se sort karke bhejta hai
-  // (sabse zyada skipped step sabse upar) — yahan sirf filter karna hai
   const skippedSteps = data?.stepBreakdown.filter((s) => s.completionRate < SKIP_THRESHOLD) ?? [];
 
   async function handleExportPdf() {
@@ -128,25 +128,34 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
           }
 
           <h2 style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;">Execution history</h2>
-          <table style="width:100%;border-collapse:collapse;font-size:12px;">
-            <tr style="border-bottom:1px solid #e5e7eb;">
-              <th style="text-align:left;padding:8px;color:#6b7280;">Executor</th>
-              <th style="text-align:left;padding:8px;color:#6b7280;">Status</th>
-              <th style="text-align:left;padding:8px;color:#6b7280;">Progress</th>
-              <th style="text-align:left;padding:8px;color:#6b7280;">Started</th>
-            </tr>
-            ${data.runs
-              .map(
-                (r) => `
-              <tr style="border-bottom:1px solid #f3f4f6;">
-                <td style="padding:8px;color:#111827;">${r.executorName ?? r.executorEmail}</td>
-                <td style="padding:8px;color:${r.status === "overdue" ? "#dc2626" : "#111827"};text-transform:capitalize;">${r.status.replace("_", " ")}</td>
-                <td style="padding:8px;color:#111827;">${r.completedItems}/${r.totalItems}</td>
-                <td style="padding:8px;color:#9ca3af;">${new Date(r.startedAt).toLocaleDateString()}</td>
-              </tr>`
-              )
-              .join("")}
-          </table>
+          ${data.runs
+            .map((r) => {
+              const pct = Math.round((r.completedItems / r.totalItems) * 100);
+              return `
+              <div style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;padding:14px;page-break-inside:avoid;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                  <span style="font-size:13px;font-weight:600;color:#111827;">${r.executorName ?? r.executorEmail}</span>
+                  <span style="font-size:11px;color:${r.status === "overdue" ? "#dc2626" : "#6b7280"};text-transform:capitalize;">
+                    ${r.status.replace("_", " ")} · ${r.completedItems}/${r.totalItems} · ${new Date(r.startedAt).toLocaleDateString()}
+                  </span>
+                </div>
+                <div style="width:100%;height:6px;background:#e5e7eb;border-radius:9999px;overflow:hidden;margin-bottom:10px;">
+                  <div style="width:${pct}%;height:100%;background:${r.status === "overdue" ? "#dc2626" : "#16a34a"};"></div>
+                </div>
+                ${r.checklistItems
+                  .map(
+                    (item) => `
+                  <div style="display:flex;align-items:flex-start;gap:6px;padding:2px 0;">
+                    <span style="font-size:11px;color:${item.ticked ? "#16a34a" : "#d1d5db"};min-width:12px;">${item.ticked ? "✓" : "○"}</span>
+                    <span style="font-size:11px;color:${item.ticked ? "#374151" : "#9ca3af"};text-decoration:${item.ticked ? "line-through" : "none"};">
+                      ${item.stepTitle} — ${item.text}
+                    </span>
+                  </div>`
+                  )
+                  .join("")}
+              </div>`;
+            })
+            .join("")}
 
           <div style="margin-top:32px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;">
             Exported from FlowMind — for internal compliance review purposes
@@ -232,7 +241,6 @@ export default function AuditReportModal({ sopId, onClose }: Props) {
                   <p className="text-xs text-gray-400 mb-1">Completed</p>
                   <p className="text-xl font-bold text-green-600">{data.summary.completedRuns}</p>
                 </div>
-                {/* 👇 Naya — overdue runs pehle kahin nahi dikhte the, compliance ke liye critical hai */}
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
                   <p className="text-xs text-gray-400 mb-1 flex items-center gap-1">
                     <AlertOctagon className="w-3 h-3" /> Overdue

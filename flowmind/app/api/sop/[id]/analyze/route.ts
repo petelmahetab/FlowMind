@@ -133,7 +133,7 @@ Based on this data, provide a concise analysis in JSON format with this exact st
 Only return JSON, no other text. Focus on items with low completion rates or unusually high time-to-complete.`;
 
   const completion = await groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
     messages: [{ role: "user", content: prompt }],
     max_tokens: 1000,
     temperature: 0.3,

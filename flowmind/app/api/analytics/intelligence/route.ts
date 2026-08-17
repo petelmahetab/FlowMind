@@ -223,7 +223,7 @@ Respond ONLY with valid JSON in this exact format:
 
     try {
       const completion = await groq.chat.completions.create({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 800,
         temperature: 0.2,

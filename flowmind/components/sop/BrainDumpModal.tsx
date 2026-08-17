@@ -59,10 +59,17 @@ export default function BrainDumpModal({ onClose, onCreated }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
-            <h2 className="font-semibold text-gray-900">Describe your process</h2>
-            <p className="text-sm text-gray-400 mt-0.5">No structure needed — just write naturally</p>
+            <h2 className="font-semibold text-gray-900">
+              Describe your process
+            </h2>
+            <p className="text-sm text-gray-400 mt-0.5">
+              No structure needed — just write naturally
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 p-1 rounded"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -74,14 +81,17 @@ export default function BrainDumpModal({ onClose, onCreated }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. To deploy our app: first push to main branch, then SSH into the server..."
-            className="w-full h-36 text-sm text-gray-800 placeholder-gray-300 border border-gray-200 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            className="w-full h-36 text-sm text-gray-100 bg-[#12121a] placeholder-gray-500 border border-gray-700 rounded-xl px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent caret-indigo-400"
             disabled={loading}
           />
 
           {/* Character count */}
           <div className="flex items-center justify-between mt-1 mb-4">
-            <span className={`text-xs ${text.length < 20 ? "text-gray-300" : "text-green-500"}`}>
-              {text.length} characters {text.length < 20 && `(${20 - text.length} more needed)`}
+            <span
+              className={`text-xs ${text.length < 20 ? "text-gray-400" : "text-green-600"}`}
+            >
+              {text.length} characters{" "}
+              {text.length < 20 && `(${20 - text.length} more needed)`}
             </span>
             {error && <span className="text-xs text-red-500">{error}</span>}
           </div>
